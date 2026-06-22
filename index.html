@@ -2,7 +2,9 @@
 <html lang="zh-TW">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="screen-orientation" content="landscape">
+    <meta name="x5-orientation" content="landscape">
     <title>3D 無人機 CAA 術科標準抗風模擬器 (雙搖桿手機版)</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <style>
@@ -19,6 +21,9 @@
         #gameArea { position: relative; width: 100%; height: 100%; flex-grow: 1; box-shadow: 0 10px 30px rgba(0,0,0,0.8); overflow: hidden; display: flex; justify-content: center; background: #87CEEB; }
         canvas { display: block; width: 100%; height: 100%; object-fit: contain; }
 
+        /* 碰撞警告 */
+        #crashAlert { position: absolute; top: 20%; left: 50%; transform: translate(-50%, -50%); color: #ff4757; font-size: 32px; font-weight: bold; display: none; z-index: 100; text-shadow: 0px 0px 15px #000, 0px 0px 5px #fff; pointer-events: none; }
+
         /* 右虛擬搖桿設計 */
         #joystick-zone { position: absolute; bottom: 20px; right: 20px; width: 140px; height: 140px; background: rgba(0,0,0,0.4); border: 2px solid rgba(255,255,255,0.3); border-radius: 50%; touch-action: none; cursor: crosshair; z-index: 15; }
         #joystick-stick { width: 40px; height: 40px; background: rgba(236, 240, 241, 0.9); border-radius: 50%; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); pointer-events: none; box-shadow: 0 4px 8px rgba(0,0,0,0.5); transition: transform 0.05s ease-out; }
@@ -27,34 +32,23 @@
         #joystick-left-zone { position: absolute; bottom: 20px; left: 20px; width: 140px; height: 140px; background: rgba(0,0,0,0.4); border: 2px solid rgba(255,255,255,0.3); border-radius: 50%; touch-action: none; cursor: crosshair; z-index: 15; }
         #joystick-left-stick { width: 40px; height: 40px; background: rgba(236, 240, 241, 0.9); border-radius: 50%; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); pointer-events: none; box-shadow: 0 4px 8px rgba(0,0,0,0.5); transition: transform 0.05s ease-out; }
 
-        /* 視角調整工具浮動視窗 */
-        #camera-ui { position: absolute; top: 15px; right: 15px; background: rgba(30,39,46,0.95); border: 1px solid #718093; padding: 12px; border-radius: 8px; z-index: 20; display: none; flex-direction: column; gap: 8px; font-size: 13px; color: #dcdde1; box-shadow: 0 4px 10px rgba(0,0,0,0.6); }
-        #camera-ui .cam-row { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
-        #camera-ui input[type="range"] { width: 120px; margin: 0; }
-        
-        /* 數字輸入框美化 */
-        .cam-num { width: 50px; padding: 2px 4px; font-size: 12px; background: #111; color: #00d2d3; border: 1px solid #444; border-radius: 3px; text-align: center; outline: none; font-weight: bold; }
-        .cam-num::-webkit-outer-spin-button, .cam-num::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
-        .cam-num[type=number] { -moz-appearance: textfield; }
-
-        #camCode { background: #111; color: #fbc531; padding: 6px; border: 1px solid #444; width: 100%; box-sizing: border-box; font-family: monospace; font-size: 11px; user-select: all; resize: none; margin-top: 5px; }
-
         button, select, input { padding: 5px 10px; font-size: 14px; border-radius: 4px; border: none; }
         button { background-color: #00a8ff; color: white; cursor: pointer; font-weight: bold; }
         button:hover { background-color: #0097e6; }
+        #switchCamBtn { background-color: #fbc531; color: #2f3640; }
+        #switchCamBtn:hover { background-color: #e1b12c; }
+        
         .checkbox-label { display: flex; align-items: center; gap: 5px; cursor: pointer; user-select: none; color: #ff4757; font-weight: bold; }
         .checkbox-label.joystick-toggle { color: #2ecc71; }
-        .checkbox-label.camera-toggle { color: #fbc531; }
         input[type="checkbox"] { cursor: pointer; width: 16px; height: 16px; }
 
-        /* 手機版小螢幕優化 */
-        @media (max-width: 600px) {
-            #info-panel { font-size: 12px; }
-            #joystick-zone { width: 110px; height: 110px; bottom: 10px; right: 10px; }
-            #joystick-left-zone { width: 110px; height: 110px; bottom: 10px; left: 10px; }
-            #camera-ui { top: 10px; right: 10px; font-size: 11px; padding: 8px; }
-            #camera-ui input[type="range"] { width: 80px; }
-            .cam-num { width: 40px; }
+        /* 手機版小螢幕優化 (移除說明欄、放大遊戲佔比) */
+        @media (max-width: 850px), (max-height: 500px) {
+            #info-panel { display: none !important; }
+            #controls { padding: 6px 10px; gap: 8px; }
+            #joystick-zone { width: 115px; height: 115px; bottom: 15px; right: 20px; }
+            #joystick-left-zone { width: 115px; height: 115px; bottom: 15px; left: 20px; }
+            #crashAlert { font-size: 24px; top: 15%; }
         }
     </style>
 </head>
@@ -77,8 +71,8 @@
             </select>
         </label>
         <label class="checkbox-label"><input type="checkbox" id="showArrowBtn" > 顯示風向標示</label>
-        <label class="checkbox-label joystick-toggle"><input type="checkbox" id="showJoystickBtn" > 顯示虛擬搖桿</label>
-        <label class="checkbox-label camera-toggle"><input type="checkbox" id="toggleCameraUIBtn" > 顯示視角工具</label>
+        <label class="checkbox-label joystick-toggle"><input type="checkbox" id="showJoystickBtn" checked> 顯示虛擬搖桿</label>
+        <button id="switchCamBtn">🎥 切換視角</button>
         <button id="resetBtn">重置返回 H 起降點</button>
     </div>
 
@@ -88,36 +82,25 @@
                 <span style="color: #ff4757; font-weight: bold;">● H 起降點 (紅圈)</span> | 
                 <span style="color: #ffffff; font-weight: bold;">■ 嵌套航線矩形 (白線)</span> | 
                 <span style="color: #ff5e13; font-weight: bold;">▲ 考場交通錐 (三角錐)</span> | 
-                <span style="color: #47F0FF; font-weight: bold;">★ 藍色箭頭：模擬風吹來方向</span>
+                <span style="color: #47F0FF; font-weight: bold;">★ 藍色箭頭：風向</span> |
+                <span style="color: #f1c40f; font-weight: bold;">⭕ 球門：小心碰撞！</span>
             </div>
             <div id="windStatusText" style="color: #ff7675; font-weight: bold; background: rgba(0,0,0,0.6); padding: 4px 10px; border-radius: 4px;"></div>
         </div>
         <div class="info-row" style="color: #dcdde1; font-size: 13px;">
             <div><strong>操作：</strong> [左搖桿] 升降與旋轉(Throttle/Yaw) | [右搖桿] 前後左右平移(Pitch & Roll)</div>
-            <div><strong>提示：</strong> 無人機受限於最高 12m 與場地邊界空氣牆，觸碰邊界將自動煞停。</div>
+            <div><strong>提示：</strong> 無人機具備實體物理碰撞，觸碰邊界、三角錐與球門圈將會被彈開！</div>
         </div>
     </div>
 
     <div id="gameArea">
+        <div id="crashAlert">⚠️ 發生碰撞！</div>
         <canvas id="simCanvas"></canvas>
-        <div id="joystick-left-zone" style="display: none;">
+        <div id="joystick-left-zone" style="display: block;">
             <div id="joystick-left-stick"></div>
         </div>
-        <div id="joystick-zone" style="display: none;">
+        <div id="joystick-zone" style="display: block;">
             <div id="joystick-stick"></div>
-        </div>
-        
-        <div id="camera-ui">
-            <div style="font-weight:bold; color:#fbc531; border-bottom:1px solid #444; padding-bottom:4px; margin-bottom:4px;">🎥 視角調整工具</div>
-            <div class="cam-row">位置 X: <input type="number" id="numCamX" class="cam-num" value="0"> <input type="range" id="camPosX" min="-100" max="100" step="0.5" value="0"></div>
-            <div class="cam-row">位置 Y: <input type="number" id="numCamY" class="cam-num" value="19.2"> <input type="range" id="camPosY" min="1" max="100" step="0.5" value="19.2"></div>
-            <div class="cam-row">位置 Z: <input type="number" id="numCamZ" class="cam-num" value="5"> <input type="range" id="camPosZ" min="-100" max="100" step="0.5" value="5"></div>
-            <div style="border-top:1px dashed #444; margin: 4px 0;"></div>
-            <div class="cam-row">朝向 X: <input type="number" id="numLookX" class="cam-num" value="0"> <input type="range" id="camLookX" min="-100" max="100" step="1" value="0"></div>
-            <div class="cam-row">朝向 Y: <input type="number" id="numLookY" class="cam-num" value="-35"> <input type="range" id="camLookY" min="-100" max="50" step="1" value="-35"></div>
-            <div class="cam-row">朝向 Z: <input type="number" id="numLookZ" class="cam-num" value="-20"> <input type="range" id="camLookZ" min="-100" max="100" step="1" value="-20"></div>
-            <div style="margin-top:5px; color:#bdc3c7;">📝 程式碼參數 (可直接複製)：</div>
-            <textarea id="camCode" rows="2" readonly></textarea>
         </div>
     </div>
 
@@ -129,9 +112,7 @@
         const leftZone = document.getElementById('joystick-left-zone');
         const windStatusText = document.getElementById('windStatusText');
         const showJoystickBtn = document.getElementById('showJoystickBtn');
-        const toggleCameraUIBtn = document.getElementById('toggleCameraUIBtn');
-        const cameraUI = document.getElementById('camera-ui');
-        const camCode = document.getElementById('camCode');
+        const switchCamBtn = document.getElementById('switchCamBtn');
         
         let joyDx = 0; let joyDy = 0; let isTouching = false; 
         let joyLeftDx = 0; let joyLeftDy = 0; let isLeftTouching = false;
@@ -140,34 +121,21 @@
         let targetWind = { x: 0, z: 0 }; 
         let windTimer = null;
         let windArrow3D;
-        let useCustomCamera = false; 
+        
+        let currentCamView = 1; // 記錄目前的視角狀態
+
+        // 用來存放所有具備物理碰撞的物體
+        const colliders = [];
 
         showJoystickBtn.addEventListener('change', (e) => {
             zone.style.display = e.target.checked ? 'block' : 'none';
             leftZone.style.display = e.target.checked ? 'block' : 'none';
         });
 
-        toggleCameraUIBtn.addEventListener('change', (e) => {
-            useCustomCamera = e.target.checked;
-            cameraUI.style.display = useCustomCamera ? 'flex' : 'none';
+        // 綁定視角切換按鈕
+        switchCamBtn.addEventListener('click', () => {
+            currentCamView = (currentCamView === 1) ? 2 : 1;
         });
-
-        // --- 雙向綁定：文字輸入框與拖拉滑桿 ---
-        function setupSyncInput(rangeId, numId) {
-            const range = document.getElementById(rangeId);
-            const num = document.getElementById(numId);
-            range.addEventListener('input', () => { num.value = range.value; updateCamCode(); });
-            num.addEventListener('input', () => { range.value = num.value; updateCamCode(); });
-        }
-        setupSyncInput('camPosX', 'numCamX'); setupSyncInput('camPosY', 'numCamY'); setupSyncInput('camPosZ', 'numCamZ');
-        setupSyncInput('camLookX', 'numLookX'); setupSyncInput('camLookY', 'numLookY'); setupSyncInput('camLookZ', 'numLookZ');
-
-        function updateCamCode() {
-            const px = document.getElementById('numCamX').value; const py = document.getElementById('numCamY').value; const pz = document.getElementById('numCamZ').value;
-            const lx = document.getElementById('numLookX').value; const ly = document.getElementById('numLookY').value; const lz = document.getElementById('numLookZ').value;
-            camCode.value = `camera.position.set(${px}, ${py}, ${pz});\ncamera.lookAt(${lx}, ${ly}, ${lz});`;
-        }
-        updateCamCode();
 
         window.addEventListener('keydown', e => keys[e.key.toLowerCase()] = true);
         window.addEventListener('keyup', e => keys[e.key.toLowerCase()] = false);
@@ -260,7 +228,7 @@
         const canvas = document.getElementById('simCanvas');
         const scene = new THREE.Scene();
         scene.background = new THREE.Color(0x87CEEB); 
-        scene.fog = new THREE.Fog(0x87CEEB, 40, 200); // 配合場地變大，霧氣推遠
+        scene.fog = new THREE.Fog(0x87CEEB, 40, 200); 
 
         const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
         const renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true });
@@ -279,15 +247,14 @@
         dirLight.shadow.mapSize.width = 2048; dirLight.shadow.mapSize.height = 2048;
         scene.add(dirLight);
 
-        // --- 場地擴大 ---
-        const groundGeo = new THREE.PlaneGeometry(70, 35); // 放大了場地
+        // ★ 指定場地大小為 70x35
+        const groundGeo = new THREE.PlaneGeometry(70, 35); 
         const groundMat = new THREE.MeshLambertMaterial({ color: 0x00A806 });
         const ground = new THREE.Mesh(groundGeo, groundMat);
         ground.rotation.x = -Math.PI / 2;
         ground.receiveShadow = true;
         scene.add(ground);
 
-        // 淡綠色跑道
         function createRunwayArea() {
             const group = new THREE.Group();
             const mat = new THREE.MeshLambertMaterial({ color: 0x51DD22 }); 
@@ -303,19 +270,19 @@
         }
         scene.add(createRunwayArea());
 
-        // --- 卡通黑色 M 字小草 ---
         const grassShape = new THREE.Shape();
         grassShape.moveTo(-0.2, 0);
-        grassShape.lineTo(-0.25, 0.4); // 左尖端
-        grassShape.lineTo(0, 0.15);    // 中間凹陷處 (形成M字)
-        grassShape.lineTo(0.25, 0.4);  // 右尖端
-        grassShape.lineTo(0.2, 0);     // 右底部
-        grassShape.lineTo(-0.2, 0);    // 連回起點
+        grassShape.lineTo(-0.25, 0.4); 
+        grassShape.lineTo(0, 0.15);    
+        grassShape.lineTo(0.25, 0.4);  
+        grassShape.lineTo(0.2, 0);     
+        grassShape.lineTo(-0.2, 0);    
         const grassGeo = new THREE.ShapeGeometry(grassShape);
         
-        // 使用無光澤黑色材質，達成純黑卡通剪影風格，設定雙面可視
         const grassMat = new THREE.MeshBasicMaterial({ color: 0x2A7312, side: THREE.DoubleSide }); 
-        const grassCount = 10000; // 場地變大，加倍小草數量
+        
+        // ★ 小草數量調降至 2000 以適應較小的場地範圍
+        const grassCount = 100; 
         const grassInstanced = new THREE.InstancedMesh(grassGeo, grassMat, grassCount);
         grassInstanced.receiveShadow = true;
         grassInstanced.castShadow = true;
@@ -323,8 +290,9 @@
         const dummy = new THREE.Object3D();
         let placed = 0;
         while(placed < grassCount) {
-            let gx = (Math.random() - 0.5) * 380; // 適應新場地大小
-            let gz = (Math.random() - 0.5) * 380;
+            // ★ 將小草的生成範圍精準縮小在 70x35 的平面內 (略微縮減以防跑出場地外圍)
+            let gx = (Math.random() - 0.5) * 68; // 對應長度 70
+            let gz = (Math.random() - 0.5) * 33; // 對應寬度 35
             
             let inOuter = (gx > -19 && gx < 19 && gz > -13.2 && gz < 3.7);
             let inInner = (gx > -11.6 && gx < 11.6 && gz > -5.8 && gz < -1.7);
@@ -334,7 +302,7 @@
 
             if(!isTrack && !inHPad) {
                 dummy.position.set(gx, 0, gz);
-                dummy.rotation.y = 0; // 隨機面向
+                dummy.rotation.y = 0; 
                 let scale = 0.5 + Math.random() * 1.0;
                 dummy.scale.set(scale, scale, scale);
                 dummy.updateMatrix();
@@ -391,7 +359,42 @@
         }
 
         const conePositions = [ { x: -15.3, z: 0 }, { x: 15.3, z: 0 }, { x: -15.3, z: -9.5 }, { x: 15.3, z: -9.5 } ];
-        conePositions.forEach(pos => { const cone = createTrafficCone(); cone.position.set(pos.x, 0, pos.z); scene.add(cone); });
+        conePositions.forEach(pos => { 
+            const cone = createTrafficCone(); 
+            cone.position.set(pos.x, 0, pos.z); 
+            scene.add(cone); 
+            colliders.push({ type: 'cylinder', x: pos.x, z: pos.z, r: 0.5, yMin: 0, yMax: 1.3 });
+        });
+
+        // --- 無人機高低球門 (包含實體碰撞) ---
+        const goalData = [
+            { x: -7, y: 3, z: -4.75, radius: 1.5, tube: 0.15, color: 0xf1c40f }, 
+            { x: 0,  y: 5, z: -4.75, radius: 1.5, tube: 0.15, color: 0x9b59b6 }, 
+            { x: 7,  y: 7, z: -4.75, radius: 1.5, tube: 0.15, color: 0xe67e22 }  
+        ];
+
+        goalData.forEach(g => {
+            const ringGeo = new THREE.TorusGeometry(g.radius, g.tube, 16, 32);
+            const ringMat = new THREE.MeshLambertMaterial({ color: g.color });
+            const ring = new THREE.Mesh(ringGeo, ringMat);
+            ring.position.set(g.x, g.y, g.z);
+            ring.castShadow = true;
+            scene.add(ring);
+            
+            colliders.push({ type: 'torus', x: g.x, y: g.y, z: g.z, r: g.radius, tube: g.tube });
+
+            const poleHeight = g.y - g.radius;
+            if(poleHeight > 0) {
+                const poleGeo = new THREE.CylinderGeometry(0.1, 0.1, poleHeight, 8);
+                const poleMat = new THREE.MeshLambertMaterial({ color: 0x7f8c8d });
+                const pole = new THREE.Mesh(poleGeo, poleMat);
+                pole.position.set(g.x, poleHeight / 2, g.z);
+                pole.castShadow = true;
+                scene.add(pole);
+                
+                colliders.push({ type: 'cylinder', x: g.x, z: g.z, r: 0.15, yMin: 0, yMax: poleHeight });
+            }
+        });
 
         // --- 3. 建立無人機模型 ---
         const droneGroup = new THREE.Group(); const droneTiltGroup = new THREE.Group(); droneGroup.add(droneTiltGroup); scene.add(droneGroup);
@@ -468,7 +471,7 @@
 
                 if (!isTouching) {
                     if (rightX !== 0 || rightY !== 0) {
-                        joyDx = rightX * 60; joyDy = rightY * 60;
+                        joyDx = rightX * 80; joyDy = rightY * 80;
                         if (zone.style.display !== 'none') {
                             const r = (zone.clientWidth / 2) - (stick.offsetWidth / 2);
                             stick.style.transform = `translate(calc(-50% + ${rightX * r}px), calc(-50% + ${rightY * r}px))`;
@@ -480,33 +483,76 @@
             if (joyLeftDx !== 0) { droneLogic.yaw -= (joyLeftDx / 60) * 0.02; }
             if (joyLeftDy !== 0) { droneLogic.y -= (joyLeftDy / 60) * 0.08; }
 
-            // ★ 最高限高限制 (防止無人機飛太高)
             if (droneLogic.y < 0.2) droneLogic.y = 0.2; 
-            if (droneLogic.y > 12) droneLogic.y = 12; // 限制最高 12 公尺
+            if (droneLogic.y > 12) droneLogic.y = 10; 
 
             currentWind.x += (targetWind.x - currentWind.x) * 0.02;
             currentWind.z += (targetWind.z - currentWind.z) * 0.02;
 
             droneGroup.rotation.y = droneLogic.yaw;
 
-            let maxTilt = 0.3; let targetPitch = (joyDy / 60) * maxTilt; let targetRoll = (joyDx / 60) * maxTilt;
+            let maxTilt = 0.2; let targetPitch = (joyDy / 60) * maxTilt; let targetRoll = (joyDx / 60) * maxTilt;
             droneTiltGroup.rotation.x += (targetPitch - droneTiltGroup.rotation.x) * 0.12; droneTiltGroup.rotation.z += (targetRoll - droneTiltGroup.rotation.z) * 0.12;
 
-            let accel = 0.01; let thrustX = (joyDx / 60) * accel; let thrustZ = (joyDy / 60) * accel;
+            let accel = 0.004; let thrustX = (joyDx / 60) * accel; let thrustZ = (joyDy / 60) * accel;
             let worldAccX = thrustX * Math.cos(droneLogic.yaw) + thrustZ * Math.sin(droneLogic.yaw);
             let worldAccZ = -thrustX * Math.sin(droneLogic.yaw) + thrustZ * Math.cos(droneLogic.yaw);
 
             let windForceX = currentWind.x * 0.05; let windForceZ = currentWind.z * 0.05;
             droneLogic.vx += worldAccX + windForceX; droneLogic.vz += worldAccZ + windForceZ;
             let drag = 0.95; droneLogic.vx *= drag; droneLogic.vz *= drag;
-            droneLogic.x += droneLogic.vx; droneLogic.z += droneLogic.vz;
             
-            // ★ 空氣牆範圍限制 (碰到牆壁會將速度歸零避免卡點)
-            const mapBound = 190;
-            if(droneLogic.x > mapBound) { droneLogic.x = mapBound; droneLogic.vx = 0; }
-            if(droneLogic.x < -mapBound) { droneLogic.x = -mapBound; droneLogic.vx = 0; }
-            if(droneLogic.z > mapBound) { droneLogic.z = mapBound; droneLogic.vz = 0; }
-            if(droneLogic.z < -mapBound) { droneLogic.z = -mapBound; droneLogic.vz = 0; }
+            // 運算下一偵的預期位置
+            let nextX = droneLogic.x + droneLogic.vx;
+            let nextZ = droneLogic.z + droneLogic.vz;
+            
+            // --- 實體碰撞偵測系統 ---
+            const droneRadius = 0.4; 
+            let collisionHit = false;
+
+            for (let c of colliders) {
+                if (c.type === 'cylinder') { 
+                    let dx = nextX - c.x;
+                    let dz = nextZ - c.z;
+                    let dist2 = dx*dx + dz*dz;
+                    let minDist = droneRadius + c.r;
+                    if (dist2 < minDist*minDist && droneLogic.y >= c.yMin && droneLogic.y - 0.2 <= c.yMax) {
+                        collisionHit = true; break;
+                    }
+                } else if (c.type === 'torus') { 
+                    let dZ = Math.abs(nextZ - c.z);
+                    let dx = nextX - c.x;
+                    let dy = droneLogic.y - c.y;
+                    let dXY = Math.sqrt(dx*dx + dy*dy);
+                    
+                    if (dZ < droneRadius + c.tube) {
+                        let distToRingCenter = Math.abs(dXY - c.r);
+                        if (distToRingCenter < droneRadius + c.tube) {
+                            collisionHit = true; break;
+                        }
+                    }
+                }
+            }
+
+            if (collisionHit) {
+                droneLogic.vx *= -0.8;
+                droneLogic.vz *= -0.8;
+                
+                document.getElementById('crashAlert').style.display = 'block';
+                if(window.crashTimer) clearTimeout(window.crashTimer);
+                window.crashTimer = setTimeout(() => { document.getElementById('crashAlert').style.display = 'none'; }, 600);
+            } else {
+                droneLogic.x = nextX;
+                droneLogic.z = nextZ;
+            }
+            
+            // ★ 修改無人機的空氣牆界線，使其符合 70x35 的場地 (預留一點邊界)
+            const mapBoundX = 34.5;
+            const mapBoundZ = 17.0;
+            if(droneLogic.x > mapBoundX) { droneLogic.x = mapBoundX; droneLogic.vx = 0; }
+            if(droneLogic.x < -mapBoundX) { droneLogic.x = -mapBoundX; droneLogic.vx = 0; }
+            if(droneLogic.z > mapBoundZ) { droneLogic.z = mapBoundZ; droneLogic.vz = 0; }
+            if(droneLogic.z < -mapBoundZ) { droneLogic.z = -mapBoundZ; droneLogic.vz = 0; }
 
             droneGroup.position.x = droneLogic.x; droneGroup.position.y = droneLogic.y; droneGroup.position.z = droneLogic.z;
 
@@ -526,13 +572,14 @@
                 } else { windArrow3D.visible = false; }
             }
 
-            // --- 視角套用邏輯 ---
-            if (useCustomCamera) {
-                camera.position.set(parseFloat(document.getElementById('numCamX').value), parseFloat(document.getElementById('numCamY').value), parseFloat(document.getElementById('numCamZ').value));
-                camera.lookAt(parseFloat(document.getElementById('numLookX').value), parseFloat(document.getElementById('numLookY').value), parseFloat(document.getElementById('numLookZ').value));
+            // --- 套用按鈕切換的兩種視角 ---
+            if (currentCamView === 1) {
+                camera.position.set(0, dynamicCameraY / 1.3, 5);
+                camera.lookAt(0, -35, -20);
+
             } else {
-                camera.position.set(0, dynamicCameraY/1.3, 5);
-                camera.lookAt(0, -35,-20); 
+                camera.position.set(0, dynamicCameraY / 2, 14);
+                camera.lookAt(0, 1, -5);
             }
 
             renderer.render(scene, camera);
