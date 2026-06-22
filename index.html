@@ -35,6 +35,7 @@
             overflow: hidden;
         }
 
+        /* 移除了原本的 CSS 背景，因為我們現在有真實的 3D 天空了 */
         body::before {
             content: "";
             position: fixed;
@@ -43,10 +44,9 @@
             z-index: 1;
             background:
                 linear-gradient(rgba(255,255,255,0.04) 1px, transparent 1px),
-                linear-gradient(90deg, rgba(255,255,255,0.035) 1px, transparent 1px),
-                radial-gradient(circle at 50% 18%, rgba(38,198,255,0.18), transparent 42%);
-            background-size: 48px 48px, 48px 48px, auto;
-            opacity: 0.5;
+                linear-gradient(90deg, rgba(255,255,255,0.035) 1px, transparent 1px);
+            background-size: 48px 48px, 48px 48px;
+            opacity: 0.3;
         }
 
         #controls {
@@ -131,38 +131,8 @@
             overflow: hidden;
             display: flex;
             justify-content: center;
-            background:
-                radial-gradient(circle at 78% 16%, rgba(255,255,255,0.96) 0 2.5%, rgba(255,225,137,0.42) 7%, rgba(255,225,137,0) 18%),
-                linear-gradient(180deg, #58b8ff 0%, #8fd7ff 42%, #d8f4ff 72%, #edf9ff 100%);
+            background: #4ab4f5; /* 底色改為天空藍，以防圖片尚未載入時穿幫 */
             box-shadow: inset 0 0 90px rgba(0,0,0,0.28);
-        }
-
-        #gameArea::before,
-        #gameArea::after {
-            content: "";
-            position: absolute;
-            inset: 0;
-            pointer-events: none;
-        }
-
-        #gameArea::before {
-            z-index: 0;
-            background:
-                radial-gradient(ellipse at 18% 22%, rgba(255,255,255,0.72) 0 8%, rgba(255,255,255,0.34) 13%, transparent 22%),
-                radial-gradient(ellipse at 33% 18%, rgba(255,255,255,0.62) 0 7%, rgba(255,255,255,0.28) 12%, transparent 20%),
-                radial-gradient(ellipse at 64% 27%, rgba(255,255,255,0.58) 0 7%, rgba(255,255,255,0.24) 12%, transparent 21%),
-                radial-gradient(ellipse at 82% 34%, rgba(255,255,255,0.52) 0 6%, rgba(255,255,255,0.18) 12%, transparent 20%);
-            filter: blur(1px);
-            opacity: 0.9;
-        }
-
-        #gameArea::after {
-            z-index: 0;
-            background:
-                linear-gradient(150deg, transparent 0 58%, rgba(91,139,160,0.26) 58.5% 62%, transparent 62.5%),
-                linear-gradient(28deg, transparent 0 56%, rgba(86,132,153,0.24) 56.5% 60%, transparent 60.5%),
-                linear-gradient(180deg, transparent 0 70%, rgba(105,154,172,0.18) 70.5%, rgba(255,255,255,0) 82%);
-            opacity: 0.75;
         }
 
         canvas {
@@ -565,7 +535,10 @@
         dirLight.shadow.mapSize.width = 2048; dirLight.shadow.mapSize.height = 2048;
         scene.add(dirLight);
 
-        // 天空與雲朵效果
+        // 建立共用的 TextureLoader
+        const textureLoader = new THREE.TextureLoader();
+
+        // 天空與雲朵效果 (原有的太陽與雲層)
         function createCanvasTexture(width, height, draw) {
             const skyCanvas = document.createElement('canvas');
             skyCanvas.width = width;
@@ -577,7 +550,8 @@
             return texture;
         }
 
-        scene.fog = new THREE.Fog(0xbfeeff, 48, 210);
+	// 將霧氣顏色換成天空邊緣的淡藍色，並把起霧距離拉近 (30開始起霧，120完全看不見)
+	scene.fog = new THREE.Fog(0x87A8C2, 30, 120);
 
         const sunGlow = new THREE.Sprite(new THREE.SpriteMaterial({
             map: createCanvasTexture(256, 256, (ctx, width, height) => {
@@ -657,28 +631,42 @@
         });
 
         // ==========================================
-        // 🌟 核心優化修改區域：導入真實草地材質 🌟
+        // 🌟 新增：平面的天空 (真實天空背景板) 🌟
         // ==========================================
-        const textureLoader = new THREE.TextureLoader();
-        // 請確保您下載的圖片名為 grass.jpg 並放在與 HTML 同一個資料夾內
+        // 我們建立一塊長寬非常巨大的平面 (800x400) 作為佈景
+        const skyGeo = new THREE.PlaneGeometry(800, 400);
+        
+        // 載入線上圖庫的真實天空照片 (您也可以隨時替換成 '您的天空圖片.jpg')
+        const skyTextureImage = textureLoader.load('https://images.unsplash.com/photo-1499346030926-9a72daac6c63?q=80&w=1024&auto=format&fit=crop');
+        
+        const skyMat = new THREE.MeshBasicMaterial({ 
+            map: skyTextureImage, 
+            fog: false, // 關鍵設定：關閉霧氣影響，讓遠方的天空保持絕對清晰
+            side: THREE.DoubleSide
+        });
+        
+        const skyPlane = new THREE.Mesh(skyGeo, skyMat);
+        // 將 Y 軸從 50 降到 0，讓天空板稍微沉入地平線以下，徹底消除底部的縫隙
+skyPlane.position.set(0, 60, -200);
+        scene.add(skyPlane);
+        // ==========================================
+
+        // 草地貼圖區域
         const grassTexture = textureLoader.load('https://threejs.org/examples/textures/terrain/grasslight-big.jpg');
         grassTexture.wrapS = THREE.RepeatWrapping;
         grassTexture.wrapT = THREE.RepeatWrapping;
-        // 讓 512x512 的小草地圖片，在 70x35 的場地中重複鋪設，維持自然比例
-        grassTexture.repeat.set(20, 10); 
+        grassTexture.repeat.set(10, 5); 
 
         const groundGeo = new THREE.PlaneGeometry(70, 35); 
-        // 將原本單純的綠色 color 替換成 map 貼圖材質
         const groundMat = new THREE.MeshLambertMaterial({ map: grassTexture }); 
         const ground = new THREE.Mesh(groundGeo, groundMat);
         ground.rotation.x = -Math.PI / 2;
         ground.receiveShadow = true;
         scene.add(ground);
-        // ==========================================
 
         function createRunwayArea() {
             const group = new THREE.Group();
-            const mat = new THREE.MeshLambertMaterial({ color: 0x51DD22 }); 
+            const mat = new THREE.MeshLambertMaterial({ color: 0x8BBB91 }); 
             const topGeo = new THREE.PlaneGeometry(36, 5.4);
             const topMesh = new THREE.Mesh(topGeo, mat); topMesh.rotation.x = -Math.PI / 2; topMesh.position.set(0, 0.015, -9.5); topMesh.receiveShadow = true;
             const botGeo = new THREE.PlaneGeometry(36, 5.4);
