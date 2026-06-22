@@ -259,11 +259,10 @@
         select {
             min-height: 34px;
             color: #f7fbff;
-            background: rgba(11, 18, 32, 0.85); /* 確保背景深色 */
+            background: rgba(11, 18, 32, 0.85);
             outline: none;
         }
         
-        /* 新增：修復下拉選單選項的顏色，確保白字不會融入白底 */
         option {
             background-color: #0b1220; 
             color: #ffffff;
@@ -446,9 +445,8 @@
         let windTimer = null;
         let windArrow3D;
         
-        let currentCamView = 1; // 記錄目前的視角狀態
+        let currentCamView = 1;
 
-        // 用來存放所有具備物理碰撞的物體
         const colliders = [];
 
         showJoystickBtn.addEventListener('change', (e) => {
@@ -456,7 +454,6 @@
             leftZone.style.display = e.target.checked ? 'block' : 'none';
         });
 
-        // 綁定視角切換按鈕
         switchCamBtn.addEventListener('click', () => {
             currentCamView = (currentCamView === 1) ? 2 : 1;
         });
@@ -464,7 +461,6 @@
         window.addEventListener('keydown', e => keys[e.key.toLowerCase()] = true);
         window.addEventListener('keyup', e => keys[e.key.toLowerCase()] = false);
 
-        // 更新右搖桿位置
         function updateStickTarget(clientX, clientY) {
             const rect = zone.getBoundingClientRect();
             if(rect.width === 0) return; 
@@ -477,7 +473,6 @@
             stick.style.transform = `translate(calc(-50% + ${dx}px), calc(-50% + ${dy}px))`;
         }
 
-        // 更新左搖桿位置
         function updateLeftStickTarget(clientX, clientY) {
             const rect = leftZone.getBoundingClientRect();
             if(rect.width === 0) return; 
@@ -570,7 +565,7 @@
         dirLight.shadow.mapSize.width = 2048; dirLight.shadow.mapSize.height = 2048;
         scene.add(dirLight);
 
-        // 天空視覺效果處理
+        // 天空與雲朵效果
         function createCanvasTexture(width, height, draw) {
             const skyCanvas = document.createElement('canvas');
             skyCanvas.width = width;
@@ -582,17 +577,7 @@
             return texture;
         }
 
-        scene.background = createCanvasTexture(32, 256, (ctx, width, height) => {
-            const gradient = ctx.createLinearGradient(0, 0, 0, height);
-            gradient.addColorStop(0, '#5fb8ff');
-            gradient.addColorStop(0.45, '#9fdbff');
-            gradient.addColorStop(0.78, '#d9f4ff');
-            gradient.addColorStop(1, '#edf9ff');
-            ctx.fillStyle = gradient;
-            ctx.fillRect(0, 0, width, height);
-        });
         scene.fog = new THREE.Fog(0xbfeeff, 48, 210);
-        scene.background = null;
 
         const sunGlow = new THREE.Sprite(new THREE.SpriteMaterial({
             map: createCanvasTexture(256, 256, (ctx, width, height) => {
@@ -662,12 +647,7 @@
             { x: 68, y: 38, z: -82, s: 18, drift: 0.014 },
             { x: -8, y: 34, z: -64, s: 16, drift: 0.011 }
         ].forEach(data => {
-            const cloud = new THREE.Sprite(new THREE.SpriteMaterial({
-                map: cloudTexture,
-                transparent: true,
-                opacity: 0.5,
-                depthWrite: false
-            }));
+            const cloud = new THREE.Sprite(new THREE.SpriteMaterial({ map: cloudTexture, transparent: true, opacity: 0.5, depthWrite: false }));
             cloud.position.set(data.x, data.y, data.z);
             cloud.scale.set(data.s * 2.4, data.s, 1);
             cloud.userData.baseX = data.x;
@@ -676,13 +656,25 @@
             scene.add(cloud);
         });
 
-        // 建立綠色場地大小為 70x35
+        // ==========================================
+        // 🌟 核心優化修改區域：導入真實草地材質 🌟
+        // ==========================================
+        const textureLoader = new THREE.TextureLoader();
+        // 請確保您下載的圖片名為 grass.jpg 並放在與 HTML 同一個資料夾內
+        const grassTexture = textureLoader.load('grass.jpg');
+        grassTexture.wrapS = THREE.RepeatWrapping;
+        grassTexture.wrapT = THREE.RepeatWrapping;
+        // 讓 512x512 的小草地圖片，在 70x35 的場地中重複鋪設，維持自然比例
+        grassTexture.repeat.set(20, 10); 
+
         const groundGeo = new THREE.PlaneGeometry(70, 35); 
-        const groundMat = new THREE.MeshLambertMaterial({ color: 0x00A806 });
+        // 將原本單純的綠色 color 替換成 map 貼圖材質
+        const groundMat = new THREE.MeshLambertMaterial({ map: grassTexture }); 
         const ground = new THREE.Mesh(groundGeo, groundMat);
         ground.rotation.x = -Math.PI / 2;
         ground.receiveShadow = true;
         scene.add(ground);
+        // ==========================================
 
         function createRunwayArea() {
             const group = new THREE.Group();
@@ -710,7 +702,6 @@
         
         const grassMat = new THREE.MeshBasicMaterial({ color: 0x2A7312, side: THREE.DoubleSide }); 
         
-        // 小草數量調整為 100 叢適應較小的場地範圍
         const grassCount = 100; 
         const grassInstanced = new THREE.InstancedMesh(grassGeo, grassMat, grassCount);
         grassInstanced.receiveShadow = true;
@@ -719,9 +710,8 @@
         const dummy = new THREE.Object3D();
         let placed = 0;
         while(placed < grassCount) {
-            // 將小草的生成範圍精準縮小在 70x35 的平面內
-            let gx = (Math.random() - 0.5) * 68; // 對應長度 70
-            let gz = (Math.random() - 0.5) * 33; // 對應寬度 35
+            let gx = (Math.random() - 0.5) * 68; 
+            let gz = (Math.random() - 0.5) * 33; 
             
             let inOuter = (gx > -19 && gx < 19 && gz > -13.2 && gz < 3.7);
             let inInner = (gx > -11.6 && gx < 11.6 && gz > -5.8 && gz < -1.7);
@@ -795,7 +785,7 @@
             colliders.push({ type: 'cylinder', x: pos.x, z: pos.z, r: 0.5, yMin: 0, yMax: 1.3 });
         });
 
-        // --- 高低球門 (包含實體碰撞) ---
+        // --- 高低球門 ---
         const goalData = [
             { x: -7, y: 3, z: -4.75, radius: 1.5, tube: 0.15, color: 0xf1c40f }, 
             { x: 0,  y: 5, z: -4.75, radius: 1.5, tube: 0.15, color: 0x9b59b6 }, 
@@ -931,11 +921,9 @@
             droneLogic.vx += worldAccX + windForceX; droneLogic.vz += worldAccZ + windForceZ;
             let drag = 0.95; droneLogic.vx *= drag; droneLogic.vz *= drag;
             
-            // 運算下一偵的預期位置
             let nextX = droneLogic.x + droneLogic.vx;
             let nextZ = droneLogic.z + droneLogic.vz;
             
-            // --- 實體碰撞偵測系統 ---
             const droneRadius = 0.4; 
             let collisionHit = false;
 
@@ -975,7 +963,6 @@
                 droneLogic.z = nextZ;
             }
             
-            // 修改無人機的空氣牆界線，使其符合 70x35 的場地
             const mapBoundX = 34.5;
             const mapBoundZ = 17.0;
             if(droneLogic.x > mapBoundX) { droneLogic.x = mapBoundX; droneLogic.vx = 0; }
@@ -1001,11 +988,9 @@
                 } else { windArrow3D.visible = false; }
             }
 
-            // --- 套用按鈕切換的兩種視角 ---
             if (currentCamView === 1) {
                 camera.position.set(0, dynamicCameraY / 1.25, 5);
                 camera.lookAt(0, -35, -20);
-
             } else {
                 camera.position.set(0, dynamicCameraY / 2, 15);
                 camera.lookAt(0, 1, -5);
