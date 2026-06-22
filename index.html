@@ -16,22 +16,35 @@
         .info-row { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; }
         
         /* 3D 遊戲區域 */
-        #gameArea { position: relative; width: 100%; height: 100%; flex-grow: 1; box-shadow: 0 10px 30px rgba(0,0,0,0.8); overflow: hidden; display: flex; justify-content: center; background: #1a252f; }
+        #gameArea { position: relative; width: 100%; height: 100%; flex-grow: 1; box-shadow: 0 10px 30px rgba(0,0,0,0.8); overflow: hidden; display: flex; justify-content: center; background: #87CEEB; }
         canvas { display: block; width: 100%; height: 100%; object-fit: contain; }
 
         /* 右虛擬搖桿設計 */
-        #joystick-zone { position: absolute; bottom: 20px; right: 20px; width: 140px; height: 140px; background: rgba(0,0,0,0.4); border: 2px solid rgba(255,255,255,0.3); border-radius: 50%; touch-action: none; cursor: crosshair; }
+        #joystick-zone { position: absolute; bottom: 20px; right: 20px; width: 140px; height: 140px; background: rgba(0,0,0,0.4); border: 2px solid rgba(255,255,255,0.3); border-radius: 50%; touch-action: none; cursor: crosshair; z-index: 15; }
         #joystick-stick { width: 40px; height: 40px; background: rgba(236, 240, 241, 0.9); border-radius: 50%; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); pointer-events: none; box-shadow: 0 4px 8px rgba(0,0,0,0.5); transition: transform 0.05s ease-out; }
         
         /* 左虛擬搖桿設計 */
-        #joystick-left-zone { position: absolute; bottom: 20px; left: 20px; width: 140px; height: 140px; background: rgba(0,0,0,0.4); border: 2px solid rgba(255,255,255,0.3); border-radius: 50%; touch-action: none; cursor: crosshair; }
+        #joystick-left-zone { position: absolute; bottom: 20px; left: 20px; width: 140px; height: 140px; background: rgba(0,0,0,0.4); border: 2px solid rgba(255,255,255,0.3); border-radius: 50%; touch-action: none; cursor: crosshair; z-index: 15; }
         #joystick-left-stick { width: 40px; height: 40px; background: rgba(236, 240, 241, 0.9); border-radius: 50%; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); pointer-events: none; box-shadow: 0 4px 8px rgba(0,0,0,0.5); transition: transform 0.05s ease-out; }
+
+        /* 視角調整工具浮動視窗 */
+        #camera-ui { position: absolute; top: 15px; right: 15px; background: rgba(30,39,46,0.95); border: 1px solid #718093; padding: 12px; border-radius: 8px; z-index: 20; display: none; flex-direction: column; gap: 8px; font-size: 13px; color: #dcdde1; box-shadow: 0 4px 10px rgba(0,0,0,0.6); }
+        #camera-ui .cam-row { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+        #camera-ui input[type="range"] { width: 120px; margin: 0; }
+        
+        /* 數字輸入框美化 */
+        .cam-num { width: 50px; padding: 2px 4px; font-size: 12px; background: #111; color: #00d2d3; border: 1px solid #444; border-radius: 3px; text-align: center; outline: none; font-weight: bold; }
+        .cam-num::-webkit-outer-spin-button, .cam-num::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+        .cam-num[type=number] { -moz-appearance: textfield; }
+
+        #camCode { background: #111; color: #fbc531; padding: 6px; border: 1px solid #444; width: 100%; box-sizing: border-box; font-family: monospace; font-size: 11px; user-select: all; resize: none; margin-top: 5px; }
 
         button, select, input { padding: 5px 10px; font-size: 14px; border-radius: 4px; border: none; }
         button { background-color: #00a8ff; color: white; cursor: pointer; font-weight: bold; }
         button:hover { background-color: #0097e6; }
         .checkbox-label { display: flex; align-items: center; gap: 5px; cursor: pointer; user-select: none; color: #ff4757; font-weight: bold; }
         .checkbox-label.joystick-toggle { color: #2ecc71; }
+        .checkbox-label.camera-toggle { color: #fbc531; }
         input[type="checkbox"] { cursor: pointer; width: 16px; height: 16px; }
 
         /* 手機版小螢幕優化 */
@@ -39,6 +52,9 @@
             #info-panel { font-size: 12px; }
             #joystick-zone { width: 110px; height: 110px; bottom: 10px; right: 10px; }
             #joystick-left-zone { width: 110px; height: 110px; bottom: 10px; left: 10px; }
+            #camera-ui { top: 10px; right: 10px; font-size: 11px; padding: 8px; }
+            #camera-ui input[type="range"] { width: 80px; }
+            .cam-num { width: 40px; }
         }
     </style>
 </head>
@@ -48,6 +64,7 @@
         <label>基礎風速限制: <input type="range" id="windSpeed" min="0" max="0.15" step="0.01" value="0.05"></label>
         <label>風向模式:
             <select id="windDir">
+                <option value="NONE" selected>無風模式 (預設)</option>
                 <option value="RANDOM">★ 隨機陣風 (強/弱/無風交替)</option>
                 <option value="E">西風 (向右吹)</option>
                 <option value="W">東風 (向左吹)</option>
@@ -60,7 +77,8 @@
             </select>
         </label>
         <label class="checkbox-label"><input type="checkbox" id="showArrowBtn" > 顯示風向標示</label>
-        <label class="checkbox-label joystick-toggle"><input type="checkbox" id="showJoystickBtn"> 顯示虛擬搖桿</label>
+        <label class="checkbox-label joystick-toggle"><input type="checkbox" id="showJoystickBtn" > 顯示虛擬搖桿</label>
+        <label class="checkbox-label camera-toggle"><input type="checkbox" id="toggleCameraUIBtn" > 顯示視角工具</label>
         <button id="resetBtn">重置返回 H 起降點</button>
     </div>
 
@@ -76,7 +94,7 @@
         </div>
         <div class="info-row" style="color: #dcdde1; font-size: 13px;">
             <div><strong>操作：</strong> [左搖桿] 升降與旋轉(Throttle/Yaw) | [右搖桿] 前後左右平移(Pitch & Roll)</div>
-            <div><strong>提示：</strong> 當箭頭刺向機身時，往「箭頭尾部的反方向」推動右搖桿抗風！</div>
+            <div><strong>提示：</strong> 無人機受限於最高 12m 與場地邊界空氣牆，觸碰邊界將自動煞停。</div>
         </div>
     </div>
 
@@ -88,114 +106,124 @@
         <div id="joystick-zone" style="display: none;">
             <div id="joystick-stick"></div>
         </div>
+        
+        <div id="camera-ui">
+            <div style="font-weight:bold; color:#fbc531; border-bottom:1px solid #444; padding-bottom:4px; margin-bottom:4px;">🎥 視角調整工具</div>
+            <div class="cam-row">位置 X: <input type="number" id="numCamX" class="cam-num" value="0"> <input type="range" id="camPosX" min="-100" max="100" step="0.5" value="0"></div>
+            <div class="cam-row">位置 Y: <input type="number" id="numCamY" class="cam-num" value="19.2"> <input type="range" id="camPosY" min="1" max="100" step="0.5" value="19.2"></div>
+            <div class="cam-row">位置 Z: <input type="number" id="numCamZ" class="cam-num" value="5"> <input type="range" id="camPosZ" min="-100" max="100" step="0.5" value="5"></div>
+            <div style="border-top:1px dashed #444; margin: 4px 0;"></div>
+            <div class="cam-row">朝向 X: <input type="number" id="numLookX" class="cam-num" value="0"> <input type="range" id="camLookX" min="-100" max="100" step="1" value="0"></div>
+            <div class="cam-row">朝向 Y: <input type="number" id="numLookY" class="cam-num" value="-35"> <input type="range" id="camLookY" min="-100" max="50" step="1" value="-35"></div>
+            <div class="cam-row">朝向 Z: <input type="number" id="numLookZ" class="cam-num" value="-20"> <input type="range" id="camLookZ" min="-100" max="100" step="1" value="-20"></div>
+            <div style="margin-top:5px; color:#bdc3c7;">📝 程式碼參數 (可直接複製)：</div>
+            <textarea id="camCode" rows="2" readonly></textarea>
+        </div>
     </div>
 
     <script>
-        // --- 1. 雙虛擬搖桿與 UI 邏輯 ---
+        // --- 1. UI 與控制邏輯 ---
         const stick = document.getElementById('joystick-stick');
         const zone = document.getElementById('joystick-zone');
         const leftStick = document.getElementById('joystick-left-stick');
         const leftZone = document.getElementById('joystick-left-zone');
         const windStatusText = document.getElementById('windStatusText');
         const showJoystickBtn = document.getElementById('showJoystickBtn');
+        const toggleCameraUIBtn = document.getElementById('toggleCameraUIBtn');
+        const cameraUI = document.getElementById('camera-ui');
+        const camCode = document.getElementById('camCode');
         
-        // 右搖桿數值 (前後左右)
-        let joyDx = 0; let joyDy = 0;
-        let isTouching = false; 
-
-        // 左搖桿數值 (升降與轉向)
-        let joyLeftDx = 0; let joyLeftDy = 0;
-        let isLeftTouching = false;
-
+        let joyDx = 0; let joyDy = 0; let isTouching = false; 
+        let joyLeftDx = 0; let joyLeftDy = 0; let isLeftTouching = false;
         let keys = {};
         let currentWind = { x: 0, z: 0 }; 
         let targetWind = { x: 0, z: 0 }; 
         let windTimer = null;
         let windArrow3D;
+        let useCustomCamera = false; 
 
         showJoystickBtn.addEventListener('change', (e) => {
             zone.style.display = e.target.checked ? 'block' : 'none';
             leftZone.style.display = e.target.checked ? 'block' : 'none';
         });
 
+        toggleCameraUIBtn.addEventListener('change', (e) => {
+            useCustomCamera = e.target.checked;
+            cameraUI.style.display = useCustomCamera ? 'flex' : 'none';
+        });
+
+        // --- 雙向綁定：文字輸入框與拖拉滑桿 ---
+        function setupSyncInput(rangeId, numId) {
+            const range = document.getElementById(rangeId);
+            const num = document.getElementById(numId);
+            range.addEventListener('input', () => { num.value = range.value; updateCamCode(); });
+            num.addEventListener('input', () => { range.value = num.value; updateCamCode(); });
+        }
+        setupSyncInput('camPosX', 'numCamX'); setupSyncInput('camPosY', 'numCamY'); setupSyncInput('camPosZ', 'numCamZ');
+        setupSyncInput('camLookX', 'numLookX'); setupSyncInput('camLookY', 'numLookY'); setupSyncInput('camLookZ', 'numLookZ');
+
+        function updateCamCode() {
+            const px = document.getElementById('numCamX').value; const py = document.getElementById('numCamY').value; const pz = document.getElementById('numCamZ').value;
+            const lx = document.getElementById('numLookX').value; const ly = document.getElementById('numLookY').value; const lz = document.getElementById('numLookZ').value;
+            camCode.value = `camera.position.set(${px}, ${py}, ${pz});\ncamera.lookAt(${lx}, ${ly}, ${lz});`;
+        }
+        updateCamCode();
+
         window.addEventListener('keydown', e => keys[e.key.toLowerCase()] = true);
         window.addEventListener('keyup', e => keys[e.key.toLowerCase()] = false);
 
-        // 更新右搖桿位置
+        // 虛擬搖桿座標更新
         function updateStickTarget(clientX, clientY) {
             const rect = zone.getBoundingClientRect();
             if(rect.width === 0) return; 
-            
             const currentMaxStickRadius = rect.width / 2 - stick.offsetWidth / 2;
-            const centerX = rect.left + rect.width / 2;
-            const centerY = rect.top + rect.height / 2;
-            let dx = clientX - centerX;
-            let dy = clientY - centerY;
+            const centerX = rect.left + rect.width / 2; const centerY = rect.top + rect.height / 2;
+            let dx = clientX - centerX; let dy = clientY - centerY;
             let distance = Math.sqrt(dx * dx + dy * dy);
-            
-            if (distance > currentMaxStickRadius) {
-                dx = (dx / distance) * currentMaxStickRadius;
-                dy = (dy / distance) * currentMaxStickRadius;
-            }
-            
-            joyDx = (dx / currentMaxStickRadius) * 60; 
-            joyDy = (dy / currentMaxStickRadius) * 60;
-            
+            if (distance > currentMaxStickRadius) { dx = (dx / distance) * currentMaxStickRadius; dy = (dy / distance) * currentMaxStickRadius; }
+            joyDx = (dx / currentMaxStickRadius) * 60; joyDy = (dy / currentMaxStickRadius) * 60;
             stick.style.transform = `translate(calc(-50% + ${dx}px), calc(-50% + ${dy}px))`;
         }
 
-        // 更新左搖桿位置
         function updateLeftStickTarget(clientX, clientY) {
             const rect = leftZone.getBoundingClientRect();
             if(rect.width === 0) return; 
-            
             const currentMaxStickRadius = rect.width / 2 - leftStick.offsetWidth / 2;
-            const centerX = rect.left + rect.width / 2;
-            const centerY = rect.top + rect.height / 2;
-            let dx = clientX - centerX;
-            let dy = clientY - centerY;
+            const centerX = rect.left + rect.width / 2; const centerY = rect.top + rect.height / 2;
+            let dx = clientX - centerX; let dy = clientY - centerY;
             let distance = Math.sqrt(dx * dx + dy * dy);
-            
-            if (distance > currentMaxStickRadius) {
-                dx = (dx / distance) * currentMaxStickRadius;
-                dy = (dy / distance) * currentMaxStickRadius;
-            }
-            
-            joyLeftDx = (dx / currentMaxStickRadius) * 60; 
-            joyLeftDy = (dy / currentMaxStickRadius) * 60;
-            
+            if (distance > currentMaxStickRadius) { dx = (dx / distance) * currentMaxStickRadius; dy = (dy / distance) * currentMaxStickRadius; }
+            joyLeftDx = (dx / currentMaxStickRadius) * 60; joyLeftDy = (dy / currentMaxStickRadius) * 60;
             leftStick.style.transform = `translate(calc(-50% + ${dx}px), calc(-50% + ${dy}px))`;
         }
 
-        // 綁定右搖桿事件
         zone.addEventListener('mousemove', (e) => { isTouching = true; updateStickTarget(e.clientX, e.clientY); });
         zone.addEventListener('mouseleave', () => { isTouching = false; joyDx = 0; joyDy = 0; stick.style.transform = `translate(-50%, -50%)`; });
-        zone.addEventListener('touchmove', (e) => { e.preventDefault(); isTouching = true; updateStickTarget(e.touches[0].clientX, e.touches[0].clientY); }, { passive: false });
-        zone.addEventListener('touchend', () => { isTouching = false; joyDx = 0; joyDy = 0; stick.style.transform = `translate(-50%, -50%)`; });
+        zone.addEventListener('touchstart', (e) => { e.preventDefault(); isTouching = true; updateStickTarget(e.targetTouches[0].clientX, e.targetTouches[0].clientY); }, { passive: false });
+        zone.addEventListener('touchmove', (e) => { e.preventDefault(); isTouching = true; updateStickTarget(e.targetTouches[0].clientX, e.targetTouches[0].clientY); }, { passive: false });
+        zone.addEventListener('touchend', (e) => { e.preventDefault(); isTouching = false; joyDx = 0; joyDy = 0; stick.style.transform = `translate(-50%, -50%)`; }, { passive: false });
 
-        // 綁定左搖桿事件
         leftZone.addEventListener('mousemove', (e) => { isLeftTouching = true; updateLeftStickTarget(e.clientX, e.clientY); });
         leftZone.addEventListener('mouseleave', () => { isLeftTouching = false; joyLeftDx = 0; joyLeftDy = 0; leftStick.style.transform = `translate(-50%, -50%)`; });
-        leftZone.addEventListener('touchmove', (e) => { e.preventDefault(); isLeftTouching = true; updateLeftStickTarget(e.touches[0].clientX, e.touches[0].clientY); }, { passive: false });
-        leftZone.addEventListener('touchend', () => { isLeftTouching = false; joyLeftDx = 0; joyLeftDy = 0; leftStick.style.transform = `translate(-50%, -50%)`; });
+        leftZone.addEventListener('touchstart', (e) => { e.preventDefault(); isLeftTouching = true; updateLeftStickTarget(e.targetTouches[0].clientX, e.targetTouches[0].clientY); }, { passive: false });
+        leftZone.addEventListener('touchmove', (e) => { e.preventDefault(); isLeftTouching = true; updateLeftStickTarget(e.targetTouches[0].clientX, e.targetTouches[0].clientY); }, { passive: false });
+        leftZone.addEventListener('touchend', (e) => { e.preventDefault(); isLeftTouching = false; joyLeftDx = 0; joyLeftDy = 0; leftStick.style.transform = `translate(-50%, -50%)`; }, { passive: false });
 
         function updateWind() {
             let speed = parseFloat(document.getElementById('windSpeed').value);
             let dir = document.getElementById('windDir').value;
-            
-            if (dir === 'RANDOM') {
+            if (dir === 'NONE') {
+                windStatusText.innerText = `【無風模式】環境平穩`;
+                targetWind.x = 0; targetWind.z = 0;
+            } else if (dir === 'RANDOM') {
                 windStatusText.innerText = `【動態陣風模式】環境：強風、弱風、無風自然交替中`;
             } else {
                 windStatusText.innerText = `【恆定風向模式】環境風速: ${(speed * 200).toFixed(0)} 節`;
                 let wx = 0, wz = 0;
-                if (dir.includes('E')) wx = 1;
-                if (dir.includes('W')) wx = -1;
-                if (dir.includes('S')) wz = 1;
-                if (dir.includes('N')) wz = -1;
-
+                if (dir.includes('E')) wx = 1; if (dir.includes('W')) wx = -1;
+                if (dir.includes('S')) wz = 1; if (dir.includes('N')) wz = -1;
                 if (wx !== 0 && wz !== 0) { wx *= 0.8; wz *= 0.8; }
-                targetWind.x = wx * speed;
-                targetWind.z = wz * speed;
+                targetWind.x = wx * speed; targetWind.z = wz * speed;
             }
         }
 
@@ -205,10 +233,7 @@
             const dirs = ['E', 'W', 'S', 'N', 'NE', 'NW', 'SE', 'SW'];
             let nextDuration = 1500 + Math.random() * 3500; 
             let stateRoll = Math.random();
-
-            if (stateRoll < 0.3) {
-                targetWind.x = 0; targetWind.z = 0;
-            } else {
+            if (stateRoll < 0.3) { targetWind.x = 0; targetWind.z = 0; } else {
                 let dirStr = dirs[Math.floor(Math.random() * dirs.length)];
                 let wx = 0, wz = 0;
                 if (dirStr.includes('E')) wx = 1; if (dirStr.includes('W')) wx = -1;
@@ -234,55 +259,103 @@
         // --- 2. Three.js 3D 引擎建置 ---
         const canvas = document.getElementById('simCanvas');
         const scene = new THREE.Scene();
-        scene.background = new THREE.Color(0x1a252f); 
-        scene.fog = new THREE.Fog(0x1a252f, 40, 150);
+        scene.background = new THREE.Color(0x87CEEB); 
+        scene.fog = new THREE.Fog(0x87CEEB, 40, 200); // 配合場地變大，霧氣推遠
 
         const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
         const renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true });
-        
         renderer.shadowMap.enabled = true;
         renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
-        const ambientLight = new THREE.AmbientLight(0xffffff, 0.75);
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.85);
         scene.add(ambientLight);
         
         const dirLight = new THREE.DirectionalLight(0xffffff, 0.5);
         dirLight.position.set(20, 80, 20);
         dirLight.castShadow = true;
-        dirLight.shadow.camera.left = -40; dirLight.shadow.camera.right = 40;
-        dirLight.shadow.camera.top = 40; dirLight.shadow.camera.bottom = -40;
-        dirLight.shadow.camera.near = 0.5; dirLight.shadow.camera.far = 150;
+        dirLight.shadow.camera.left = -50; dirLight.shadow.camera.right = 50;
+        dirLight.shadow.camera.top = 50; dirLight.shadow.camera.bottom = -50;
+        dirLight.shadow.camera.near = 0.5; dirLight.shadow.camera.far = 200;
         dirLight.shadow.mapSize.width = 2048; dirLight.shadow.mapSize.height = 2048;
         scene.add(dirLight);
 
-        const groundGeo = new THREE.PlaneGeometry(200, 200);
-        const groundMat = new THREE.MeshLambertMaterial({ color: 0x273c75 });
+        // --- 場地擴大 ---
+        const groundGeo = new THREE.PlaneGeometry(70, 35); // 放大了場地
+        const groundMat = new THREE.MeshLambertMaterial({ color: 0x00A806 });
         const ground = new THREE.Mesh(groundGeo, groundMat);
         ground.rotation.x = -Math.PI / 2;
         ground.receiveShadow = true;
         scene.add(ground);
 
-        const gridHelper = new THREE.GridHelper(200, 200, 0x5f27cd, 0x3b3b98);
-        gridHelper.position.y = 0.01;
-        scene.add(gridHelper);
+        // 淡綠色跑道
+        function createRunwayArea() {
+            const group = new THREE.Group();
+            const mat = new THREE.MeshLambertMaterial({ color: 0x51DD22 }); 
+            const topGeo = new THREE.PlaneGeometry(36, 5.4);
+            const topMesh = new THREE.Mesh(topGeo, mat); topMesh.rotation.x = -Math.PI / 2; topMesh.position.set(0, 0.015, -9.5); topMesh.receiveShadow = true;
+            const botGeo = new THREE.PlaneGeometry(36, 5.4);
+            const botMesh = new THREE.Mesh(botGeo, mat); botMesh.rotation.x = -Math.PI / 2; botMesh.position.set(0, 0.015, 0); botMesh.receiveShadow = true;
+            const leftGeo = new THREE.PlaneGeometry(5.4, 4.1);
+            const leftMesh = new THREE.Mesh(leftGeo, mat); leftMesh.rotation.x = -Math.PI / 2; leftMesh.position.set(-15.3, 0.015, -4.75); leftMesh.receiveShadow = true;
+            const rightGeo = new THREE.PlaneGeometry(5.4, 4.1); 
+            const rightMesh = new THREE.Mesh(rightGeo, mat); rightMesh.rotation.x = -Math.PI / 2; rightMesh.position.set(15.3, 0.015, -4.75); rightMesh.receiveShadow = true;
+            group.add(topMesh, botMesh, leftMesh, rightMesh); return group;
+        }
+        scene.add(createRunwayArea());
 
-        // 航線繪製 (粗線版)
+        // --- 卡通黑色 M 字小草 ---
+        const grassShape = new THREE.Shape();
+        grassShape.moveTo(-0.2, 0);
+        grassShape.lineTo(-0.25, 0.4); // 左尖端
+        grassShape.lineTo(0, 0.15);    // 中間凹陷處 (形成M字)
+        grassShape.lineTo(0.25, 0.4);  // 右尖端
+        grassShape.lineTo(0.2, 0);     // 右底部
+        grassShape.lineTo(-0.2, 0);    // 連回起點
+        const grassGeo = new THREE.ShapeGeometry(grassShape);
+        
+        // 使用無光澤黑色材質，達成純黑卡通剪影風格，設定雙面可視
+        const grassMat = new THREE.MeshBasicMaterial({ color: 0x2A7312, side: THREE.DoubleSide }); 
+        const grassCount = 10000; // 場地變大，加倍小草數量
+        const grassInstanced = new THREE.InstancedMesh(grassGeo, grassMat, grassCount);
+        grassInstanced.receiveShadow = true;
+        grassInstanced.castShadow = true;
+
+        const dummy = new THREE.Object3D();
+        let placed = 0;
+        while(placed < grassCount) {
+            let gx = (Math.random() - 0.5) * 380; // 適應新場地大小
+            let gz = (Math.random() - 0.5) * 380;
+            
+            let inOuter = (gx > -19 && gx < 19 && gz > -13.2 && gz < 3.7);
+            let inInner = (gx > -11.6 && gx < 11.6 && gz > -5.8 && gz < -1.7);
+            let isTrack = inOuter && !inInner; 
+            let distToH = Math.sqrt(gx*gx + gz*gz);
+            let inHPad = distToH < 3.5;
+
+            if(!isTrack && !inHPad) {
+                dummy.position.set(gx, 0, gz);
+                dummy.rotation.y = 0; // 隨機面向
+                let scale = 0.5 + Math.random() * 1.0;
+                dummy.scale.set(scale, scale, scale);
+                dummy.updateMatrix();
+                grassInstanced.setMatrixAt(placed, dummy.matrix);
+                placed++;
+            }
+        }
+        scene.add(grassInstanced);
+
         function createThickRect(minX, maxX, minZ, maxZ, thickness) {
             const group = new THREE.Group();
-            const mat = new THREE.MeshBasicMaterial({ color: 0xffffff });
+            const mat = new THREE.MeshBasicMaterial({ color: 0x000000 });
             const widthX = maxX - minX; const lengthZ = maxZ - minZ;
             const cx = (maxX + minX) / 2; const cz = (maxZ + minZ) / 2;
-
             const hGeo = new THREE.PlaneGeometry(widthX + thickness, thickness);
             const top = new THREE.Mesh(hGeo, mat); top.rotation.x = -Math.PI / 2; top.position.set(cx, 0.03, minZ);
             const bottom = new THREE.Mesh(hGeo, mat); bottom.rotation.x = -Math.PI / 2; bottom.position.set(cx, 0.03, maxZ);
-
             const vGeo = new THREE.PlaneGeometry(thickness, lengthZ - thickness);
             const left = new THREE.Mesh(vGeo, mat); left.rotation.x = -Math.PI / 2; left.position.set(minX, 0.03, cz);
             const right = new THREE.Mesh(vGeo, mat); right.rotation.x = -Math.PI / 2; right.position.set(maxX, 0.03, cz);
-
-            group.add(top, bottom, left, right);
-            return group;
+            group.add(top, bottom, left, right); return group;
         }
 
         const LINE_THICKNESS = 0.2; 
@@ -292,113 +365,64 @@
         const hPadGroup = new THREE.Group();
         hPadGroup.position.set(0, 0.04, 0);
         const ringGeo = new THREE.RingGeometry(2.5, 2.7, 32);
-        const redMat = new THREE.MeshBasicMaterial({ color: 0xff4757, side: THREE.DoubleSide });
-        const ringMesh = new THREE.Mesh(ringGeo, redMat);
-        ringMesh.rotation.x = -Math.PI / 2;
-        hPadGroup.add(ringMesh);
-
-        const hBarMat = new THREE.MeshBasicMaterial({ color: 0xff4757 });
-        const vBarGeo = new THREE.PlaneGeometry(0.45, 2.1);
-        const hBarGeo = new THREE.PlaneGeometry(1.5, 0.45);
+        const redMat = new THREE.MeshBasicMaterial({ color: 0xff0505, side: THREE.DoubleSide });
+        const ringMesh = new THREE.Mesh(ringGeo, redMat); ringMesh.rotation.x = -Math.PI / 2; hPadGroup.add(ringMesh);
+        const hBarMat = new THREE.MeshBasicMaterial({ color: 0xff0505 });
+        const vBarGeo = new THREE.PlaneGeometry(0.45, 2.1); const hBarGeo = new THREE.PlaneGeometry(1.5, 0.45);
         const leftBar = new THREE.Mesh(vBarGeo, hBarMat); leftBar.position.set(-0.75, 0.01, 0); leftBar.rotation.x = -Math.PI/2;
         const rightBar = new THREE.Mesh(vBarGeo, hBarMat); rightBar.position.set(0.75, 0.01, 0); rightBar.rotation.x = -Math.PI/2;
         const midBar = new THREE.Mesh(hBarGeo, hBarMat); midBar.position.set(0, 0.01, 0); midBar.rotation.x = -Math.PI/2;
-
-        hPadGroup.add(leftBar, rightBar, midBar);
-        scene.add(hPadGroup);
+        hPadGroup.add(leftBar, rightBar, midBar); scene.add(hPadGroup);
 
         function createTrafficCone() {
             const coneGroup = new THREE.Group();
             const matConeOrange = new THREE.MeshLambertMaterial({ color: 0xff5e13 });
             const matConeWhite = new THREE.MeshLambertMaterial({ color: 0xffffff });
-            const base = new THREE.Mesh(new THREE.BoxGeometry(1.0, 0.06, 1.0), matConeOrange);
-            base.position.y = 0.03; base.castShadow = true; coneGroup.add(base);
-
+            const base = new THREE.Mesh(new THREE.BoxGeometry(1.0, 0.06, 1.0), matConeOrange); base.position.y = 0.03; base.castShadow = true; coneGroup.add(base);
             const heights = [0.4, 0.25, 0.25, 0.35]; const colors = [matConeOrange, matConeWhite, matConeOrange, matConeWhite];
             let currentY = 0.06; let currentRadius = 0.4;
-            
             for(let i = 0; i < 4; i++) {
                 let nextRadius = currentRadius - (0.35 * (heights[i] / 1.25));
                 if(i === 3) nextRadius = 0.04; 
                 const seg = new THREE.Mesh(new THREE.CylinderGeometry(nextRadius, currentRadius, heights[i], 16), colors[i]);
                 seg.position.y = currentY + heights[i]/2; seg.castShadow = true; coneGroup.add(seg);
                 currentY += heights[i]; currentRadius = nextRadius;
-            }
-            return coneGroup;
+            } return coneGroup;
         }
 
         const conePositions = [ { x: -15.3, z: 0 }, { x: 15.3, z: 0 }, { x: -15.3, z: -9.5 }, { x: 15.3, z: -9.5 } ];
         conePositions.forEach(pos => { const cone = createTrafficCone(); cone.position.set(pos.x, 0, pos.z); scene.add(cone); });
 
         // --- 3. 建立無人機模型 ---
-        const droneGroup = new THREE.Group(); 
-        const droneTiltGroup = new THREE.Group(); 
-        droneGroup.add(droneTiltGroup);
-        scene.add(droneGroup);
+        const droneGroup = new THREE.Group(); const droneTiltGroup = new THREE.Group(); droneGroup.add(droneTiltGroup); scene.add(droneGroup);
+        const matBodyWhite = new THREE.MeshLambertMaterial({ color: 0xecf0f1 }); const matBodyDark = new THREE.MeshLambertMaterial({ color: 0x2d3436 }); 
+        const matMotor = new THREE.MeshStandardMaterial({ color: 0xbdc3c7, metalness: 0.8, roughness: 0.2 }); const matProp = new THREE.MeshLambertMaterial({ color: 0x111111, transparent: true, opacity: 0.5, side: THREE.DoubleSide }); 
+        const matLens = new THREE.MeshStandardMaterial({ color: 0x0984e3, metalness: 0.9, roughness: 0.1 }); const matRedLED = new THREE.MeshBasicMaterial({ color: 0xff4757 }); 
+        const matGreenLED = new THREE.MeshBasicMaterial({ color: 0x2ecc71 }); const matArmFront = new THREE.MeshLambertMaterial({ color: 0xff4757 }); 
 
-        const matBodyWhite = new THREE.MeshLambertMaterial({ color: 0xecf0f1 }); 
-        const matBodyDark = new THREE.MeshLambertMaterial({ color: 0x2d3436 }); 
-        const matMotor = new THREE.MeshStandardMaterial({ color: 0xbdc3c7, metalness: 0.8, roughness: 0.2 }); 
-        const matProp = new THREE.MeshLambertMaterial({ color: 0x111111, transparent: true, opacity: 0.5, side: THREE.DoubleSide }); 
-        const matLens = new THREE.MeshStandardMaterial({ color: 0x0984e3, metalness: 0.9, roughness: 0.1 }); 
-        const matRedLED = new THREE.MeshBasicMaterial({ color: 0xff4757 }); 
-        const matGreenLED = new THREE.MeshBasicMaterial({ color: 0x2ecc71 }); 
-        const matArmFront = new THREE.MeshLambertMaterial({ color: 0xff4757 }); 
+        const body = new THREE.Mesh(new THREE.BoxGeometry(0.35, 0.15, 0.6), matBodyWhite); body.castShadow = true; droneTiltGroup.add(body);
+        const battery = new THREE.Mesh(new THREE.BoxGeometry(0.25, 0.08, 0.35), matBodyDark); battery.position.set(0, 0.11, 0.05); battery.castShadow = true; droneTiltGroup.add(battery);
+        const gimbal = new THREE.Mesh(new THREE.BoxGeometry(0.15, 0.15, 0.15), matBodyDark); gimbal.position.set(0, -0.05, -0.32); gimbal.castShadow = true; droneTiltGroup.add(gimbal);
+        const lens = new THREE.Mesh(new THREE.SphereGeometry(0.06, 16, 16), matLens); lens.position.set(0, 0, -0.08); gimbal.add(lens);
 
-        const bodyGeo = new THREE.BoxGeometry(0.35, 0.15, 0.6);
-        const body = new THREE.Mesh(bodyGeo, matBodyWhite); body.castShadow = true; droneTiltGroup.add(body);
-
-        const batteryGeo = new THREE.BoxGeometry(0.25, 0.08, 0.35);
-        const battery = new THREE.Mesh(batteryGeo, matBodyDark); battery.position.set(0, 0.11, 0.05); battery.castShadow = true; droneTiltGroup.add(battery);
-
-        const gimbalGeo = new THREE.BoxGeometry(0.15, 0.15, 0.15);
-        const gimbal = new THREE.Mesh(gimbalGeo, matBodyDark); gimbal.position.set(0, -0.05, -0.32); gimbal.castShadow = true; droneTiltGroup.add(gimbal);
-
-        const lensGeo = new THREE.SphereGeometry(0.06, 16, 16);
-        const lens = new THREE.Mesh(lensGeo, matLens); lens.position.set(0, 0, -0.08); gimbal.add(lens);
-
-        const armGeo = new THREE.CylinderGeometry(0.03, 0.04, 0.65, 16); 
-        const motorGeo = new THREE.CylinderGeometry(0.08, 0.08, 0.12, 16); 
-        const propGeo = new THREE.CylinderGeometry(0.35, 0.35, 0.01, 24); 
+        const armGeo = new THREE.CylinderGeometry(0.03, 0.04, 0.65, 16); const motorGeo = new THREE.CylinderGeometry(0.08, 0.08, 0.12, 16); const propGeo = new THREE.CylinderGeometry(0.35, 0.35, 0.01, 24); 
         const spinningProps = [];
-
-        const propPositions = [
-            { x: 0.45, z: -0.45, led: matRedLED, angle: -Math.PI / 4, isFront: true },
-            { x: -0.45, z: -0.45, led: matRedLED, angle: Math.PI / 4, isFront: true },
-            { x: 0.45, z: 0.45, led: matGreenLED, angle: Math.PI / 4, isFront: false },
-            { x: -0.45, z: 0.45, led: matGreenLED, angle: -Math.PI / 4, isFront: false }
-        ];
+        const propPositions = [ { x: 0.45, z: -0.45, led: matRedLED, angle: -Math.PI / 4, isFront: true }, { x: -0.45, z: -0.45, led: matRedLED, angle: Math.PI / 4, isFront: true }, { x: 0.45, z: 0.45, led: matGreenLED, angle: Math.PI / 4, isFront: false }, { x: -0.45, z: 0.45, led: matGreenLED, angle: -Math.PI / 4, isFront: false } ];
 
         propPositions.forEach(pos => {
             const currentArmMat = pos.isFront ? matArmFront : matBodyDark;
-            const arm = new THREE.Mesh(armGeo, currentArmMat);
-            arm.rotation.z = Math.PI / 2; arm.rotation.y = pos.angle; arm.position.set(pos.x / 2, 0, pos.z / 2); arm.castShadow = true; droneTiltGroup.add(arm);
-
+            const arm = new THREE.Mesh(armGeo, currentArmMat); arm.rotation.z = Math.PI / 2; arm.rotation.y = pos.angle; arm.position.set(pos.x / 2, 0, pos.z / 2); arm.castShadow = true; droneTiltGroup.add(arm);
             const motor = new THREE.Mesh(motorGeo, matMotor); motor.position.set(pos.x, 0.06, pos.z); motor.castShadow = true; droneTiltGroup.add(motor);
-
             const prop = new THREE.Mesh(propGeo, matProp); prop.position.set(pos.x, 0.13, pos.z); prop.castShadow = true; droneTiltGroup.add(prop); spinningProps.push(prop); 
-
             const led = new THREE.Mesh(new THREE.SphereGeometry(0.06, 16, 16), pos.led); led.position.set(pos.x, 0.10, pos.z); droneTiltGroup.add(led);
         });
 
-        const legGeo = new THREE.CylinderGeometry(0.02, 0.01, 0.2, 8);
-        const legPositions = [ { x: 0.12, z: -0.15 }, { x: -0.12, z: -0.15 }, { x: 0.12, z: 0.15 }, { x: -0.12, z: 0.15 } ];
+        const legGeo = new THREE.CylinderGeometry(0.02, 0.01, 0.2, 8); const legPositions = [ { x: 0.12, z: -0.15 }, { x: -0.12, z: -0.15 }, { x: 0.12, z: 0.15 }, { x: -0.12, z: 0.15 } ];
         legPositions.forEach(pos => { const leg = new THREE.Mesh(legGeo, matBodyDark); leg.position.set(pos.x, -0.15, pos.z); leg.castShadow = true; droneTiltGroup.add(leg); });
+        const topArrow = new THREE.Mesh(new THREE.ConeGeometry(0.1, 0.25, 3), matRedLED); topArrow.rotation.x = -Math.PI / 2; topArrow.position.set(0, 0.16, -0.12); topArrow.castShadow = true; droneTiltGroup.add(topArrow);
 
-        const topArrowGeo = new THREE.ConeGeometry(0.1, 0.25, 3);
-        const topArrow = new THREE.Mesh(topArrowGeo, matRedLED); topArrow.rotation.x = -Math.PI / 2; topArrow.position.set(0, 0.16, -0.12); topArrow.castShadow = true; droneTiltGroup.add(topArrow);
+        windArrow3D = new THREE.ArrowHelper(new THREE.Vector3(1, 0, 0), new THREE.Vector3(0, 5.0, 10), 3, 0x3498db, 1.5, 0.8); scene.add(windArrow3D);
 
-        windArrow3D = new THREE.ArrowHelper(
-            new THREE.Vector3(1, 0, 0), 
-            new THREE.Vector3(0, 5.0, 10), 
-            3, 
-            0x3498db, 
-            1.5,      
-            0.8       
-        );
-        scene.add(windArrow3D);
-
-        // 初始化帶有高度 (y=3) 的物理變數
         let droneLogic = { x: 0, y: 3, z: 0, vx: 0, vz: 0, yaw: 0 }; 
         droneGroup.position.y = droneLogic.y; 
 
@@ -421,24 +445,17 @@
             requestAnimationFrame(animate);
             resizeCanvasToDisplaySize();
 
-            if (typeof spinningProps !== 'undefined') {
-                spinningProps.forEach(prop => { prop.rotation.y += 0.8; });
-            }
+            if (typeof spinningProps !== 'undefined') { spinningProps.forEach(prop => { prop.rotation.y += 0.8; }); }
 
-            // 鍵盤 Yaw 轉向支援
             if (keys['a']) droneLogic.yaw += 0.025; 
             if (keys['d']) droneLogic.yaw -= 0.025;
             
-            const gamepads = navigator.getGamepads ? navigator.getGamepads() : [];
-            const gp = gamepads[0]; 
+            const gamepads = navigator.getGamepads ? navigator.getGamepads() : []; const gp = gamepads[0]; 
             if (gp) {
                 const deadzone = 0.1; 
-                let leftX = Math.abs(gp.axes[0]) > deadzone ? gp.axes[0] : 0;
-                let leftY = Math.abs(gp.axes[1]) > deadzone ? gp.axes[1] : 0;
-                let rightX = Math.abs(gp.axes[2]) > deadzone ? gp.axes[2] : 0;
-                let rightY = Math.abs(gp.axes[3]) > deadzone ? gp.axes[3] : 0;
+                let leftX = Math.abs(gp.axes[0]) > deadzone ? gp.axes[0] : 0; let leftY = Math.abs(gp.axes[1]) > deadzone ? gp.axes[1] : 0;
+                let rightX = Math.abs(gp.axes[2]) > deadzone ? gp.axes[2] : 0; let rightY = Math.abs(gp.axes[3]) > deadzone ? gp.axes[3] : 0;
 
-                // Gamepad 覆寫左搖桿數值
                 if (!isLeftTouching) {
                     if (leftX !== 0 || leftY !== 0) {
                         joyLeftDx = leftX * 60; joyLeftDy = leftY * 60;
@@ -446,13 +463,9 @@
                             const r = (leftZone.clientWidth / 2) - (leftStick.offsetWidth / 2);
                             leftStick.style.transform = `translate(calc(-50% + ${leftX * r}px), calc(-50% + ${leftY * r}px))`;
                         }
-                    } else {
-                        joyLeftDx = 0; joyLeftDy = 0;
-                        if (leftZone.style.display !== 'none') leftStick.style.transform = `translate(-50%, -50%)`;
-                    }
+                    } else { joyLeftDx = 0; joyLeftDy = 0; if (leftZone.style.display !== 'none') leftStick.style.transform = `translate(-50%, -50%)`; }
                 }
 
-                // Gamepad 覆寫右搖桿數值
                 if (!isTouching) {
                     if (rightX !== 0 || rightY !== 0) {
                         joyDx = rightX * 60; joyDy = rightY * 60;
@@ -460,71 +473,43 @@
                             const r = (zone.clientWidth / 2) - (stick.offsetWidth / 2);
                             stick.style.transform = `translate(calc(-50% + ${rightX * r}px), calc(-50% + ${rightY * r}px))`;
                         }
-                    } else {
-                        joyDx = 0; joyDy = 0;
-                        if (zone.style.display !== 'none') stick.style.transform = `translate(-50%, -50%)`;
-                    }
+                    } else { joyDx = 0; joyDy = 0; if (zone.style.display !== 'none') stick.style.transform = `translate(-50%, -50%)`; }
                 }
             }
 
-            // --- ★ 結合左搖桿數值 (轉換為物理運算) ---
-            if (joyLeftDx !== 0) {
-                // 左搖桿左右 = Yaw (左右旋轉)
-                droneLogic.yaw -= (joyLeftDx / 60) * 0.04; 
-            }
-            if (joyLeftDy !== 0) {
-                // 左搖桿上下 = Throttle (上升與下降)，往上推 joyLeftDy 會是負值，所以用減的來增加高度
-                //droneLogic.y -= (joyLeftDy / 60) * 0.15; 
-            }
+            if (joyLeftDx !== 0) { droneLogic.yaw -= (joyLeftDx / 60) * 0.02; }
+            if (joyLeftDy !== 0) { droneLogic.y -= (joyLeftDy / 60) * 0.08; }
 
-            // 設定無人機高度的地板與天花板界線 (不可鑽入地底)
+            // ★ 最高限高限制 (防止無人機飛太高)
             if (droneLogic.y < 0.2) droneLogic.y = 0.2; 
-            if (droneLogic.y > 30) droneLogic.y = 30; 
+            if (droneLogic.y > 12) droneLogic.y = 12; // 限制最高 12 公尺
 
-            // 風向運算
             currentWind.x += (targetWind.x - currentWind.x) * 0.02;
             currentWind.z += (targetWind.z - currentWind.z) * 0.02;
 
             droneGroup.rotation.y = droneLogic.yaw;
 
-            // 右搖桿控制 Pitch(前後) & Roll(左右平移)
-            let maxTilt = 0.35; 
-            let targetPitch = (joyDy / 60) * maxTilt; 
-            let targetRoll = (joyDx / 60) * maxTilt;
+            let maxTilt = 0.3; let targetPitch = (joyDy / 60) * maxTilt; let targetRoll = (joyDx / 60) * maxTilt;
+            droneTiltGroup.rotation.x += (targetPitch - droneTiltGroup.rotation.x) * 0.12; droneTiltGroup.rotation.z += (targetRoll - droneTiltGroup.rotation.z) * 0.12;
 
-            droneTiltGroup.rotation.x += (targetPitch - droneTiltGroup.rotation.x) * 0.12;
-            droneTiltGroup.rotation.z += (targetRoll - droneTiltGroup.rotation.z) * 0.12;
-
-            let accel = 0.008; 
-            let thrustX = (joyDx / 60) * accel;
-            let thrustZ = (joyDy / 60) * accel;
-
+            let accel = 0.01; let thrustX = (joyDx / 60) * accel; let thrustZ = (joyDy / 60) * accel;
             let worldAccX = thrustX * Math.cos(droneLogic.yaw) + thrustZ * Math.sin(droneLogic.yaw);
             let worldAccZ = -thrustX * Math.sin(droneLogic.yaw) + thrustZ * Math.cos(droneLogic.yaw);
 
-            let windForceX = currentWind.x * 0.05; 
-            let windForceZ = currentWind.z * 0.05;
-
-            droneLogic.vx += worldAccX + windForceX;
-            droneLogic.vz += worldAccZ + windForceZ;
-
-            let drag = 0.95; 
-            droneLogic.vx *= drag;
-            droneLogic.vz *= drag;
-
-            droneLogic.x += droneLogic.vx;
-            droneLogic.z += droneLogic.vz;
+            let windForceX = currentWind.x * 0.05; let windForceZ = currentWind.z * 0.05;
+            droneLogic.vx += worldAccX + windForceX; droneLogic.vz += worldAccZ + windForceZ;
+            let drag = 0.95; droneLogic.vx *= drag; droneLogic.vz *= drag;
+            droneLogic.x += droneLogic.vx; droneLogic.z += droneLogic.vz;
             
-            // 設定邊界
-            if(droneLogic.x > 90) droneLogic.x = 90; if(droneLogic.x < -90) droneLogic.x = -90;
-            if(droneLogic.z > 90) droneLogic.z = 90; if(droneLogic.z < -90) droneLogic.z = -90;
+            // ★ 空氣牆範圍限制 (碰到牆壁會將速度歸零避免卡點)
+            const mapBound = 190;
+            if(droneLogic.x > mapBound) { droneLogic.x = mapBound; droneLogic.vx = 0; }
+            if(droneLogic.x < -mapBound) { droneLogic.x = -mapBound; droneLogic.vx = 0; }
+            if(droneLogic.z > mapBound) { droneLogic.z = mapBound; droneLogic.vz = 0; }
+            if(droneLogic.z < -mapBound) { droneLogic.z = -mapBound; droneLogic.vz = 0; }
 
-            // 套用座標至實體
-            droneGroup.position.x = droneLogic.x;
-            droneGroup.position.y = droneLogic.y; // ★ 套用高度
-            droneGroup.position.z = droneLogic.z;
+            droneGroup.position.x = droneLogic.x; droneGroup.position.y = droneLogic.y; droneGroup.position.z = droneLogic.z;
 
-            // 風向箭頭防穿模跟隨
             let showArrow = document.getElementById('showArrowBtn').checked;
             if (windArrow3D) {
                 let windSpeedMag = Math.sqrt(currentWind.x**2 + currentWind.z**2);
@@ -532,33 +517,30 @@
                     windArrow3D.visible = true;
                     let wVector = new THREE.Vector3(currentWind.x, 0, currentWind.z).normalize();
                     let arrowLen = 3 + windSpeedMag * 30; 
-                    windArrow3D.setDirection(wVector);
-                    windArrow3D.setLength(arrowLen, 0.5, 0.4);
-
+                    windArrow3D.setDirection(wVector); windArrow3D.setLength(arrowLen, 0.5, 0.4);
                     let offsetDistance = 1.2; 
                     let tipPos = droneGroup.position.clone().sub(wVector.multiplyScalar(offsetDistance));
-                    // 箭頭高度永遠跟著無人機最新的高度走
                     tipPos.y = droneGroup.position.y; 
                     let originPos = tipPos.clone().sub(wVector.multiplyScalar(arrowLen));
                     windArrow3D.position.copy(originPos);
-                } else {
-                    windArrow3D.visible = false; 
-                }
+                } else { windArrow3D.visible = false; }
             }
 
-            camera.position.set(0, dynamicCameraY/1.3, 5);
-            camera.lookAt(0, -35,-20); 
+            // --- 視角套用邏輯 ---
+            if (useCustomCamera) {
+                camera.position.set(parseFloat(document.getElementById('numCamX').value), parseFloat(document.getElementById('numCamY').value), parseFloat(document.getElementById('numCamZ').value));
+                camera.lookAt(parseFloat(document.getElementById('numLookX').value), parseFloat(document.getElementById('numLookY').value), parseFloat(document.getElementById('numLookZ').value));
+            } else {
+                camera.position.set(0, dynamicCameraY/1.3, 5);
+                camera.lookAt(0, -35,-20); 
+            }
 
             renderer.render(scene, camera);
         }
 
-        if (document.getElementById('windDir').value === 'RANDOM') {
-            triggerRandomWind();
-        }
+        if (document.getElementById('windDir').value === 'RANDOM') { triggerRandomWind(); }
         
-        updateDynamicHeight();
-        updateWind();
-        animate();
+        updateDynamicHeight(); updateWind(); animate();
     </script>
 </body>
 </html>
