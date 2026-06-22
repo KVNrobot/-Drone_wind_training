@@ -661,7 +661,7 @@
         // ==========================================
         const textureLoader = new THREE.TextureLoader();
         // 請確保您下載的圖片名為 grass.jpg 並放在與 HTML 同一個資料夾內
-        const grassTexture = textureLoader.load('grass.jpg');
+        const grassTexture = textureLoader.load('https://threejs.org/examples/textures/terrain/grasslight-big.jpg');
         grassTexture.wrapS = THREE.RepeatWrapping;
         grassTexture.wrapT = THREE.RepeatWrapping;
         // 讓 512x512 的小草地圖片，在 70x35 的場地中重複鋪設，維持自然比例
