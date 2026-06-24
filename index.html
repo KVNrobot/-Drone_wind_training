@@ -898,7 +898,7 @@ skyPlane.position.set(0, 60, -200);
 
             droneGroup.rotation.y = droneLogic.yaw;
 
-            let maxTilt = 0.2; let targetPitch = (joyDy / 60) * maxTilt; let targetRoll = (joyDx / 60) * maxTilt;
+            let maxTilt = 0.2; let targetPitch = (joyDy / 60) * maxTilt; let targetRoll = -(joyDx / 60) * maxTilt;
             droneTiltGroup.rotation.x += (targetPitch - droneTiltGroup.rotation.x) * 0.12; droneTiltGroup.rotation.z += (targetRoll - droneTiltGroup.rotation.z) * 0.12;
 
             let accel = 0.004; let thrustX = (joyDx / 60) * accel; let thrustZ = (joyDy / 60) * accel;
