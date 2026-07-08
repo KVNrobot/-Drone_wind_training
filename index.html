@@ -347,6 +347,14 @@
 <body>
 
     <div id="controls">
+        <!-- 若您先前沒複製到這一段，現在請一併複製進去 -->
+        <label>搖桿模式:
+            <select id="gamepadMode">
+                <option value="auto" selected>自動偵測</option>
+                <option value="xinput">標準配置 (XInput / Xbox)</option>
+                <option value="direct">原生配置 (DirectInput / PS)</option>
+            </select>
+        </label>
         <label>風速 <input type="range" id="windSpeed" min="0" max="0.08" step="0.01" value="0"></label>
         <label>風向:
             <select id="windDir">
@@ -365,23 +373,23 @@
         <label class="checkbox-label"><input type="checkbox" id="showArrowBtn" > 顯示風向箭頭</label>
         <label class="checkbox-label joystick-toggle"><input type="checkbox" id="showJoystickBtn" checked> 顯示雙搖桿</label>
         <button id="switchCamBtn">切換視角</button>
-        <button id="resetBtn">重設到 H 起降點</button>
+        <button id="resetBtn">重設</button>
     </div>
 
     <div id="info-panel">
         <div class="info-row">
             <div>
                 <span style="color: #ff4757; font-weight: bold;">H 起降點</span> | 
-                <span style="color: #ffffff; font-weight: bold;">白色航線</span> | 
+                <span style="color: #ffffff; font-weight: bold;">黑色航線</span> | 
                 <span style="color: #ff9d4d; font-weight: bold;">橘色立柱</span> | 
-                <span style="color: #47F0FF; font-weight: bold;">藍色障礙區</span> |
-                <span style="color: #f1c40f; font-weight: bold;">黃色目標區</span>
+                <span style="color: #47F0FF; font-weight: bold;">藍色立柱</span> |
+                <span style="color: #f1c40f; font-weight: bold;">黃色立柱</span>
             </div>
             <div id="windStatusText" style="color: #ff7675; font-weight: bold; background: rgba(0,0,0,0.6); padding: 4px 10px; border-radius: 4px;"></div>
         </div>
         <div class="info-row" style="color: #dcdde1; font-size: 13px;">
             <div><strong>控制:</strong> 左搖桿控制升降與轉向 (油門/偏航)，右搖桿控制前後左右平移 (俯仰/滾轉)</div>
-            <div><strong>目標:</strong> 沿航線通過障礙與目標區，最後返回 H 起降點</div>
+            <div><strong>目標:</strong> 若實體右搖桿無反應，請於上方切換「搖桿模式」。</div>
         </div>
     </div>
 
@@ -467,8 +475,11 @@
         leftZone.addEventListener('touchend', (e) => { e.preventDefault(); isLeftTouching = false; joyLeftDx = 0; joyLeftDy = 0; leftStick.style.transform = `translate(-50%, -50%)`; }, { passive: false });
 
         function updateWind() {
-            let speed = parseFloat(document.getElementById('windSpeed').value);
-            let dir = document.getElementById('windDir').value;
+            let speedText = document.getElementById('windSpeed').value;
+            let speed = speedText ? parseFloat(speedText) : 0; // 防呆確保不是 NaN
+            let dirSelect = document.getElementById('windDir');
+            let dir = dirSelect ? dirSelect.value : 'NONE';
+
             if (dir === 'NONE') {
                 windStatusText.innerText = `目前無風：環境穩定`;
                 targetWind.x = 0; targetWind.z = 0;
@@ -484,8 +495,9 @@
             }
         }
         function triggerRandomWind() {
-            if (document.getElementById('windDir').value !== 'RANDOM') return;
-            const baseSpeed = parseFloat(document.getElementById('windSpeed').value);
+            let dirSelect = document.getElementById('windDir');
+            if (!dirSelect || dirSelect.value !== 'RANDOM') return;
+            const baseSpeed = parseFloat(document.getElementById('windSpeed').value) || 0;
             const dirs = ['E', 'W', 'S', 'N', 'NE', 'NW', 'SE', 'SW'];
             let nextDuration = 1500 + Math.random() * 3500; 
             let stateRoll = Math.random();
@@ -501,16 +513,21 @@
             clearTimeout(windTimer); windTimer = setTimeout(triggerRandomWind, nextDuration);
         }
 
-        document.getElementById('windSpeed').addEventListener('input', updateWind);
-        document.getElementById('windDir').addEventListener('change', () => {
+        let windSpeedEl = document.getElementById('windSpeed');
+        let windDirEl = document.getElementById('windDir');
+        if(windSpeedEl) windSpeedEl.addEventListener('input', updateWind);
+        if(windDirEl) windDirEl.addEventListener('change', () => {
             clearTimeout(windTimer);
-            if (document.getElementById('windDir').value === 'RANDOM') { updateWind(); triggerRandomWind(); } else { updateWind(); }
+            if (windDirEl.value === 'RANDOM') { updateWind(); triggerRandomWind(); } else { updateWind(); }
         });
         
-        document.getElementById('resetBtn').addEventListener('click', () => {
-            droneLogic.x = 0; droneLogic.y = 3; droneLogic.z = 0; droneLogic.vx = 0; droneLogic.vz = 0; droneLogic.yaw = 0;
-            updateWind();
-        });
+        let resetBtn = document.getElementById('resetBtn');
+        if(resetBtn) {
+            resetBtn.addEventListener('click', () => {
+                droneLogic.x = 0; droneLogic.y = 3; droneLogic.z = 0; droneLogic.vx = 0; droneLogic.vz = 0; droneLogic.yaw = 0;
+                updateWind();
+            });
+        }
 
         // --- 2. Three.js 3D 場景建置 ---
         const canvas = document.getElementById('simCanvas');
@@ -547,7 +564,7 @@
             return texture;
         }
 
-	scene.fog = new THREE.Fog(0x87A8C2, 30, 120);
+	    scene.fog = new THREE.Fog(0x87A8C2, 30, 120);
 
         const sunGlow = new THREE.Sprite(new THREE.SpriteMaterial({
             map: createCanvasTexture(256, 256, (ctx, width, height) => {
@@ -828,6 +845,7 @@
 
         function resizeCanvasToDisplaySize() {
             const container = document.getElementById('gameArea');
+            if(!container) return; // 防呆
             const width = container.clientWidth; const height = container.clientHeight;
             if (canvas.width !== width || canvas.height !== height) {
                 renderer.setSize(width, height, false); camera.aspect = width / height; camera.updateProjectionMatrix(); updateDynamicHeight();
@@ -847,24 +865,38 @@
             const gamepads = navigator.getGamepads ? navigator.getGamepads() : []; const gp = gamepads[0]; 
             if (gp) {
                 const deadzone = 0.1; 
-                // 左搖桿通常綁定 axes[0] 和 axes[1]
-                let leftX = Math.abs(gp.axes[0]) > deadzone ? gp.axes[0] : 0; 
-                let leftY = Math.abs(gp.axes[1]) > deadzone ? gp.axes[1] : 0;
                 
-                // --- 修正右邊搖桿的硬體對應 ---
-                // 主人的硬體將右搖桿映射為 Z軸(上下) 與 Z旋轉(左右)
-                // 在 Gamepad API 中：Z軸 = axes[2]，Z旋轉 = axes[5]
+                // === 加入防呆機制：確保讀取軸不會出錯 ===
+                let leftX = 0; let leftY = 0;
+                if(gp.axes.length >= 2) {
+                    leftX = Math.abs(gp.axes[0]) > deadzone ? gp.axes[0] : 0; 
+                    leftY = Math.abs(gp.axes[1]) > deadzone ? gp.axes[1] : 0;
+                }
+                
                 let rightX = 0; 
                 let rightY = 0;
 
-                // 優先嘗試讀取 Z旋轉(axes[5]) 與 Z軸(axes[2])
-                if (gp.axes.length > 5) {
-                    rightX = Math.abs(gp.axes[5]) > deadzone ? gp.axes[5] : 0; // 左右
-                    rightY = Math.abs(gp.axes[2]) > deadzone ? gp.axes[2] : 0; // 上下
+                // --- 讀取 UI 設定的搖桿模式 (加上找不到元件的防呆機制) ---
+                const modeSelect = document.getElementById('gamepadMode');
+                const mode = modeSelect ? modeSelect.value : 'auto';
+                
+                let useDirectInput = false;
+
+                if (mode === 'direct') {
+                    useDirectInput = true;
+                } else if (mode === 'xinput') {
+                    useDirectInput = false;
+                } else {
+                    useDirectInput = (gp.mapping !== 'standard' && gp.axes.length > 5);
+                }
+
+                // 根據模式指派右搖桿的訊號來源
+                if (useDirectInput && gp.axes.length > 5) {
+                    rightX = Math.abs(gp.axes[5]) > deadzone ? gp.axes[5] : 0; // PS 原生: Z旋轉
+                    rightY = Math.abs(gp.axes[2]) > deadzone ? gp.axes[2] : 0; // PS 原生: Z軸
                 } else if (gp.axes.length > 3) {
-                    // 若沒有第5軸，退回標準 XInput 搖桿對應
-                    rightX = Math.abs(gp.axes[2]) > deadzone ? gp.axes[2] : 0; 
-                    rightY = Math.abs(gp.axes[3]) > deadzone ? gp.axes[3] : 0; 
+                    rightX = Math.abs(gp.axes[2]) > deadzone ? gp.axes[2] : 0; // 標準 Xbox: X軸
+                    rightY = Math.abs(gp.axes[3]) > deadzone ? gp.axes[3] : 0; // 標準 Xbox: Y軸
                 }
 
                 if (!isLeftTouching) {
@@ -952,9 +984,10 @@
                 droneLogic.vx *= -0.8;
                 droneLogic.vz *= -0.8;
                 
-                document.getElementById('crashAlert').style.display = 'block';
+                let crashAlertEl = document.getElementById('crashAlert');
+                if(crashAlertEl) crashAlertEl.style.display = 'block'; // 防呆
                 if(window.crashTimer) clearTimeout(window.crashTimer);
-                window.crashTimer = setTimeout(() => { document.getElementById('crashAlert').style.display = 'none'; }, 600);
+                window.crashTimer = setTimeout(() => { if(crashAlertEl) crashAlertEl.style.display = 'none'; }, 600);
             } else {
                 droneLogic.x = nextX;
                 droneLogic.z = nextZ;
@@ -969,7 +1002,8 @@
 
             droneGroup.position.x = droneLogic.x; droneGroup.position.y = droneLogic.y; droneGroup.position.z = droneLogic.z;
 
-            let showArrow = document.getElementById('showArrowBtn').checked;
+            let showArrowBtn = document.getElementById('showArrowBtn');
+            let showArrow = showArrowBtn ? showArrowBtn.checked : false; // 防呆
             if (windArrow3D) {
                 let windSpeedMag = Math.sqrt(currentWind.x**2 + currentWind.z**2);
                 if (windSpeedMag > 0.005 && showArrow) { 
@@ -986,11 +1020,11 @@
             }
 
             if (currentCamView === 1) {
-                camera.position.set(0, dynamicCameraY / 1.25, 5);
+                camera.position.set(0, dynamicCameraY / 1, 8);
                 camera.lookAt(0, -35, -25);
             } else {
-                camera.position.set(0, dynamicCameraY / 2, 15);
-                camera.lookAt(0, 1, -10);
+                camera.position.set(0, dynamicCameraY / 3, 20);
+                camera.lookAt(0, -40, -200);
             }
 
             const skyTime = performance.now() * 0.001;
@@ -1002,7 +1036,8 @@
             renderer.render(scene, camera);
         }
 
-        if (document.getElementById('windDir').value === 'RANDOM') { triggerRandomWind(); }
+        let windDirElForInit = document.getElementById('windDir');
+        if (windDirElForInit && windDirElForInit.value === 'RANDOM') { triggerRandomWind(); }
         
         updateDynamicHeight(); updateWind(); animate();
     </script>
