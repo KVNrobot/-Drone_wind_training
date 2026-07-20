@@ -644,7 +644,7 @@
         });
 
         const skyGeo = new THREE.PlaneGeometry(800, 400);
-        const skyTextureImage = textureLoader.load('https://images.unsplash.com/photo-1499346030926-9a72daac6c63?q=80&w=1024&auto=format&fit=crop');
+        const skyTextureImage = textureLoader.load('./assets/sky.webp');
         const skyMat = new THREE.MeshBasicMaterial({ 
             map: skyTextureImage, 
             fog: false,
@@ -654,7 +654,7 @@
         skyPlane.position.set(0, 60, -200);
         scene.add(skyPlane);
 
-        const grassTexture = textureLoader.load('https://threejs.org/examples/textures/terrain/grasslight-big.jpg');
+        const grassTexture = textureLoader.load('./assets/grasslight-big.webp');
         grassTexture.wrapS = THREE.RepeatWrapping;
         grassTexture.wrapT = THREE.RepeatWrapping;
         grassTexture.repeat.set(10, 5); 
