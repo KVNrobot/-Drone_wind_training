@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="zh-TW">
 <head>
     <meta charset="UTF-8">
@@ -8,7 +8,7 @@
     <title>無人機抗風特訓</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 	<link rel="preload" as="image" href="./assets/grasslight-big.webp">
-        <style>
+    <style>
         :root {
             --hud-bg: rgba(11, 18, 32, 0.72);
             --hud-border: rgba(255, 255, 255, 0.18);
@@ -48,6 +48,17 @@
             background-size: 48px 48px, 48px 48px;
             opacity: 0.3;
         }
+        
+        /* 新增：設定開關按鈕的專屬樣式 */
+        #togglePanelBtn {
+            position: fixed;
+            top: max(12px, env(safe-area-inset-top));
+            right: 16px;
+            z-index: 40;
+            font-size: 15px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+            background: rgba(11, 18, 32, 0.85);
+        }
 
         #controls {
             position: fixed;
@@ -67,6 +78,15 @@
             border-radius: 8px;
             box-shadow: 0 18px 44px rgba(0,0,0,0.34), 0 0 28px var(--hud-glow);
             backdrop-filter: blur(14px) saturate(130%);
+            /* 修改：加入過場動畫屬性 */
+            transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s ease;
+        }
+
+        /* 新增：定義面板收合狀態（往上推移並變透明） */
+        #controls.collapsed {
+            transform: translate(-50%, -150%);
+            opacity: 0;
+            pointer-events: none;
         }
 
         #controls label {
@@ -329,8 +349,14 @@
 
         @media (max-width: 900px), (max-height: 560px) {
             #info-panel { display: none !important; }
-            #controls {
+            /* 針對手機版微調右上角按鈕與展開面板的間距 */
+            #togglePanelBtn {
+                font-size: 13px;
                 top: max(8px, env(safe-area-inset-top));
+                right: 8px;
+            }
+            #controls {
+                top: max(45px, env(safe-area-inset-top)); 
                 width: calc(100vw - 16px);
                 padding: 8px 10px;
                 gap: 7px;
@@ -347,8 +373,11 @@
 </head>
 <body>
 
+    <!-- 新增：固定在畫面右上角的開關按鈕 -->
+    <button id="togglePanelBtn">⚙️ 顯示設定</button>
+
+    <!-- 加上 collapsed 預設隱藏類別 -->
     <div id="controls">
-        <!-- 若您先前沒複製到這一段，現在請一併複製進去 -->
         <label>搖桿模式:
             <select id="gamepadMode">
                 <option value="auto" selected>自動偵測</option>
@@ -375,6 +404,8 @@
         <label class="checkbox-label joystick-toggle"><input type="checkbox" id="showJoystickBtn" checked> 顯示雙搖桿</label>
         <button id="switchCamBtn">切換視角</button>
         <button id="resetBtn">重設</button>
+        <!-- 新增：面板內的關閉按鈕 -->
+        <button id="closePanelBtn" style="background: linear-gradient(180deg, #ff4d6d, #c9002b);">關閉面板</button>
     </div>
 
     <div id="info-panel">
@@ -406,6 +437,27 @@
     </div>
 
     <script>
+        // --- 新增：設定面板收合與展開邏輯 ---
+        const togglePanelBtn = document.getElementById('togglePanelBtn');
+        const controlsPanel = document.getElementById('controls');
+        const closePanelBtn = document.getElementById('closePanelBtn');
+
+        function togglePanel() {
+            const isCollapsed = controlsPanel.classList.toggle('collapsed');
+            togglePanelBtn.innerHTML = isCollapsed ? '⚙️ 顯示設定' : '❌ 隱藏設定';
+        }
+
+        if (togglePanelBtn) {
+            togglePanelBtn.addEventListener('click', togglePanel);
+        }
+
+        if (closePanelBtn) {
+            closePanelBtn.addEventListener('click', () => {
+                controlsPanel.classList.add('collapsed');
+                togglePanelBtn.innerHTML = '⚙️ 顯示設定';
+            });
+        }
+
         // --- 1. UI 與控制邏輯 ---
         const stick = document.getElementById('joystick-stick');
         const zone = document.getElementById('joystick-zone');
@@ -477,7 +529,7 @@
 
         function updateWind() {
             let speedText = document.getElementById('windSpeed').value;
-            let speed = speedText ? parseFloat(speedText) : 0; // 防呆確保不是 NaN
+            let speed = speedText ? parseFloat(speedText) : 0; 
             let dirSelect = document.getElementById('windDir');
             let dir = dirSelect ? dirSelect.value : 'NONE';
 
@@ -495,6 +547,7 @@
                 targetWind.x = wx * speed; targetWind.z = wz * speed;
             }
         }
+        
         function triggerRandomWind() {
             let dirSelect = document.getElementById('windDir');
             if (!dirSelect || dirSelect.value !== 'RANDOM') return;
@@ -840,30 +893,23 @@
 
         let dynamicCameraY = 25; 
         function updateDynamicHeight() {
-  // 1. 維持原本最適合的相機高度（不要再往上拉高了）
-  dynamicCameraY = 25; 
+            dynamicCameraY = 25; 
+            const baseFov = 45;      
+            const baseAspect = 1.6;  
 
-  // 2. 針對手機窄螢幕，動態把視野角 (FOV) 變廣
-  const baseFov = 45;      // 預設的視野角度
-  const baseAspect = 1.6;  // 筆電寬螢幕的標準長寬比
-
-  if (camera.aspect < baseAspect) {
-    // 螢幕變窄時，計算出需要的「廣角」程度來塞入全部場地
-    const cameraHeight = Math.tan(THREE.MathUtils.degToRad(baseFov / 2));
-    const currentCameraHeight = cameraHeight * (baseAspect / camera.aspect);
-    camera.fov = THREE.MathUtils.radToDeg(Math.atan(currentCameraHeight)) * 2;
-  } else {
-    // 螢幕夠寬時，維持正常的 45 度視角
-    camera.fov = baseFov;
-  }
-  
-  // 更新相機設定，讓畫面生效
-  camera.updateProjectionMatrix();
-}
+            if (camera.aspect < baseAspect) {
+                const cameraHeight = Math.tan(THREE.MathUtils.degToRad(baseFov / 2));
+                const currentCameraHeight = cameraHeight * (baseAspect / camera.aspect);
+                camera.fov = THREE.MathUtils.radToDeg(Math.atan(currentCameraHeight)) * 2;
+            } else {
+                camera.fov = baseFov;
+            }
+            camera.updateProjectionMatrix();
+        }
 
         function resizeCanvasToDisplaySize() {
             const container = document.getElementById('gameArea');
-            if(!container) return; // 防呆
+            if(!container) return;
             const width = container.clientWidth; const height = container.clientHeight;
             if (canvas.width !== width || canvas.height !== height) {
                 renderer.setSize(width, height, false); camera.aspect = width / height; camera.updateProjectionMatrix(); updateDynamicHeight();
@@ -884,7 +930,6 @@
             if (gp) {
                 const deadzone = 0.1; 
                 
-                // === 加入防呆機制：確保讀取軸不會出錯 ===
                 let leftX = 0; let leftY = 0;
                 if(gp.axes.length >= 2) {
                     leftX = Math.abs(gp.axes[0]) > deadzone ? gp.axes[0] : 0; 
@@ -894,7 +939,6 @@
                 let rightX = 0; 
                 let rightY = 0;
 
-                // --- 讀取 UI 設定的搖桿模式 (加上找不到元件的防呆機制) ---
                 const modeSelect = document.getElementById('gamepadMode');
                 const mode = modeSelect ? modeSelect.value : 'auto';
                 
@@ -908,13 +952,12 @@
                     useDirectInput = (gp.mapping !== 'standard' && gp.axes.length > 5);
                 }
 
-                // 根據模式指派右搖桿的訊號來源
                 if (useDirectInput && gp.axes.length > 5) {
-                    rightX = Math.abs(gp.axes[5]) > deadzone ? gp.axes[5] : 0; // PS 原生: Z旋轉
-                    rightY = Math.abs(gp.axes[2]) > deadzone ? gp.axes[2] : 0; // PS 原生: Z軸
+                    rightX = Math.abs(gp.axes[5]) > deadzone ? gp.axes[5] : 0; 
+                    rightY = Math.abs(gp.axes[2]) > deadzone ? gp.axes[2] : 0; 
                 } else if (gp.axes.length > 3) {
-                    rightX = Math.abs(gp.axes[2]) > deadzone ? gp.axes[2] : 0; // 標準 Xbox: X軸
-                    rightY = Math.abs(gp.axes[3]) > deadzone ? gp.axes[3] : 0; // 標準 Xbox: Y軸
+                    rightX = Math.abs(gp.axes[2]) > deadzone ? gp.axes[2] : 0; 
+                    rightY = Math.abs(gp.axes[3]) > deadzone ? gp.axes[3] : 0; 
                 }
 
                 if (!isLeftTouching) {
@@ -938,7 +981,6 @@
                 }
             }
 
-            // 左搖桿 (joyLeftDx, joyLeftDy) -> 控制高度 (上升/下降) 與 轉向 (偏航)
             if (joyLeftDx !== 0) { droneLogic.yaw -= (joyLeftDx / 60) * 0.025; }
             if (joyLeftDy !== 0) { droneLogic.y -= (joyLeftDy / 60) * 0.08; }
 
@@ -950,7 +992,6 @@
 
             droneGroup.rotation.y = droneLogic.yaw;
 
-            // 右搖桿 (joyDx, joyDy) -> 控制前進後退 (俯仰) 與 左右平移 (滾轉)
             let maxTilt = 0.2; 
             let targetPitch = (joyDy / 60) * maxTilt; 
             let targetRoll = -(joyDx / 60) * maxTilt;
@@ -1003,7 +1044,7 @@
                 droneLogic.vz *= -0.8;
                 
                 let crashAlertEl = document.getElementById('crashAlert');
-                if(crashAlertEl) crashAlertEl.style.display = 'block'; // 防呆
+                if(crashAlertEl) crashAlertEl.style.display = 'block';
                 if(window.crashTimer) clearTimeout(window.crashTimer);
                 window.crashTimer = setTimeout(() => { if(crashAlertEl) crashAlertEl.style.display = 'none'; }, 600);
             } else {
@@ -1021,7 +1062,7 @@
             droneGroup.position.x = droneLogic.x; droneGroup.position.y = droneLogic.y; droneGroup.position.z = droneLogic.z;
 
             let showArrowBtn = document.getElementById('showArrowBtn');
-            let showArrow = showArrowBtn ? showArrowBtn.checked : false; // 防呆
+            let showArrow = showArrowBtn ? showArrowBtn.checked : false;
             if (windArrow3D) {
                 let windSpeedMag = Math.sqrt(currentWind.x**2 + currentWind.z**2);
                 if (windSpeedMag > 0.005 && showArrow) { 
