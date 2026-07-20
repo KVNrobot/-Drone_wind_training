@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="zh-TW">
 <head>
     <meta charset="UTF-8">
@@ -711,9 +711,9 @@
         const grassTexture = textureLoader.load('./assets/grasslight-big.webp');
         grassTexture.wrapS = THREE.RepeatWrapping;
         grassTexture.wrapT = THREE.RepeatWrapping;
-        grassTexture.repeat.set(10, 5); 
+        grassTexture.repeat.set(40, 20); 
 
-        const groundGeo = new THREE.PlaneGeometry(70, 35); 
+        const groundGeo = new THREE.PlaneGeometry(400, 200); 
         const groundMat = new THREE.MeshLambertMaterial({ map: grassTexture }); 
         const ground = new THREE.Mesh(groundGeo, groundMat);
         ground.rotation.x = -Math.PI / 2;
