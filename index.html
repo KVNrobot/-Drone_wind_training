@@ -840,9 +840,26 @@
 
         let dynamicCameraY = 25; 
         function updateDynamicHeight() {
-            const baseHeight = 25; 
-            if (camera.aspect < 1.6) { dynamicCameraY = baseHeight * (1.6 / camera.aspect); } else { dynamicCameraY = baseHeight; }
-        }
+  // 1. 維持原本最適合的相機高度（不要再往上拉高了）
+  dynamicCameraY = 25; 
+
+  // 2. 針對手機窄螢幕，動態把視野角 (FOV) 變廣
+  const baseFov = 45;      // 預設的視野角度
+  const baseAspect = 1.6;  // 筆電寬螢幕的標準長寬比
+
+  if (camera.aspect < baseAspect) {
+    // 螢幕變窄時，計算出需要的「廣角」程度來塞入全部場地
+    const cameraHeight = Math.tan(THREE.MathUtils.degToRad(baseFov / 2));
+    const currentCameraHeight = cameraHeight * (baseAspect / camera.aspect);
+    camera.fov = THREE.MathUtils.radToDeg(Math.atan(currentCameraHeight)) * 2;
+  } else {
+    // 螢幕夠寬時，維持正常的 45 度視角
+    camera.fov = baseFov;
+  }
+  
+  // 更新相機設定，讓畫面生效
+  camera.updateProjectionMatrix();
+}
 
         function resizeCanvasToDisplaySize() {
             const container = document.getElementById('gameArea');
